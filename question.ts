@@ -135,8 +135,9 @@ export default function question(pi: ExtensionAPI) {
 
 		renderCall(args, theme) {
 			let text = theme.fg("toolTitle", theme.bold("question ")) + theme.fg("muted", args.question);
-			if (args.options?.length) {
-				const displayOptions = [...args.options, "Other..."];
+			const opts = Array.isArray(args.options) ? args.options : [];
+			if (opts.length) {
+				const displayOptions = [...opts, "Other..."];
 				text += `\n${theme.fg("dim", `  Options: ${displayOptions.join(", ")}`)}`;
 			}
 			return new Text(text, 0, 0);
