@@ -22,8 +22,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Key } from "@mariozechner/pi-tui";
 
-// Read-only tools for plan mode (+ questionnaire for clarifications)
-const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "questionnaire"];
+// Read-only tools for plan mode (+ question/questionnaire for clarifications)
+const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "question", "questionnaire"];
 
 // Full set of tools for normal mode
 const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
