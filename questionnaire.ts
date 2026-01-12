@@ -29,6 +29,7 @@ interface Answer {
 	value: string;
 	label: string;
 	wasCustom: boolean;
+	index?: number;
 }
 
 interface QuestionnaireResult {
@@ -152,8 +153,8 @@ export default function questionnaire(pi: ExtensionAPI) {
 					refresh();
 				}
 
-				function saveAnswer(questionId: string, value: string, label: string, wasCustom: boolean) {
-					answers.set(questionId, { id: questionId, value, label, wasCustom });
+				function saveAnswer(questionId: string, value: string, label: string, wasCustom: boolean, index?: number) {
+					answers.set(questionId, { id: questionId, value, label, wasCustom, index });
 				}
 
 				// Editor submit callback
@@ -233,7 +234,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 							refresh();
 							return;
 						}
-						saveAnswer(q.id, opt.value, opt.label, false);
+						saveAnswer(q.id, opt.value, opt.label, false, optionIndex + 1);
 						advanceAfterAnswer();
 						return;
 					}
@@ -358,8 +359,10 @@ export default function questionnaire(pi: ExtensionAPI) {
 
 			const answerLines = result.answers.map((a) => {
 				const qLabel = questions.find((q) => q.id === a.id)?.label || a.id;
-				const prefix = a.wasCustom ? "user wrote: " : "user selected: ";
-				return `${qLabel}: ${prefix}${a.label}`;
+				if (a.wasCustom) {
+					return `${qLabel}: user wrote: ${a.label}`;
+				}
+				return `${qLabel}: user selected: ${a.index}. ${a.label}`;
 			});
 
 			return {
@@ -390,8 +393,11 @@ export default function questionnaire(pi: ExtensionAPI) {
 				return new Text(theme.fg("warning", "Cancelled"), 0, 0);
 			}
 			const lines = details.answers.map((a) => {
-				const prefix = a.wasCustom ? theme.fg("muted", "(wrote) ") : "";
-				return theme.fg("success", "✓ ") + theme.fg("accent", a.id) + ": " + prefix + a.label;
+				if (a.wasCustom) {
+					return theme.fg("success", "✓ ") + theme.fg("accent", a.id) + ": " + theme.fg("muted", "(wrote) ") + a.label;
+				}
+				const display = a.index ? `${a.index}. ${a.label}` : a.label;
+				return theme.fg("success", "✓ ") + theme.fg("accent", a.id) + ": " + display;
 			});
 			return new Text(lines.join("\n"), 0, 0);
 		},

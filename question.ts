@@ -45,7 +45,7 @@ export default function question(pi: ExtensionAPI) {
 			// Build options with "Other..."
 			const allOptions = [...params.options, "Other..."];
 
-			const result = await ctx.ui.custom<{ answer: string; wasCustom: boolean } | null>((tui, theme, _kb, done) => {
+			const result = await ctx.ui.custom<{ answer: string; wasCustom: boolean; index?: number } | null>((tui, theme, _kb, done) => {
 				let optionIndex = 0;
 				let editMode = false;
 				let cachedLines: string[] | undefined;
@@ -112,7 +112,7 @@ export default function question(pi: ExtensionAPI) {
 							editMode = true;
 							refresh();
 						} else {
-							done({ answer: selected, wasCustom: false });
+							done({ answer: selected, wasCustom: false, index: optionIndex + 1 });
 						}
 						return;
 					}
@@ -180,10 +180,15 @@ export default function question(pi: ExtensionAPI) {
 				};
 			}
 
-			const prefix = result.wasCustom ? "User wrote: " : "User selected: ";
+			if (result.wasCustom) {
+				return {
+					content: [{ type: "text", text: `User wrote: ${result.answer}` }],
+					details: { question: params.question, options: params.options, answer: result.answer, wasCustom: true } as QuestionDetails,
+				};
+			}
 			return {
-				content: [{ type: "text", text: prefix + result.answer }],
-				details: { question: params.question, options: params.options, answer: result.answer, wasCustom: result.wasCustom } as QuestionDetails,
+				content: [{ type: "text", text: `User selected: ${result.index}. ${result.answer}` }],
+				details: { question: params.question, options: params.options, answer: result.answer, wasCustom: false } as QuestionDetails,
 			};
 		},
 
@@ -191,7 +196,8 @@ export default function question(pi: ExtensionAPI) {
 			let text = theme.fg("toolTitle", theme.bold("question ")) + theme.fg("muted", args.question);
 			const opts = Array.isArray(args.options) ? args.options : [];
 			if (opts.length) {
-				text += `\n${theme.fg("dim", `  Options: ${[...opts, "Other..."].join(", ")}`)}`;
+				const numbered = [...opts, "Other..."].map((o, i) => `${i + 1}. ${o}`);
+				text += `\n${theme.fg("dim", `  Options: ${numbered.join(", ")}`)}`;
 			}
 			return new Text(text, 0, 0);
 		},
@@ -210,7 +216,10 @@ export default function question(pi: ExtensionAPI) {
 			if (details.wasCustom) {
 				return new Text(theme.fg("success", "✓ ") + theme.fg("muted", "(wrote) ") + theme.fg("accent", details.answer), 0, 0);
 			}
-			return new Text(theme.fg("success", "✓ ") + theme.fg("accent", details.answer), 0, 0);
+			// Find the index of the selected option
+			const idx = details.options.indexOf(details.answer) + 1;
+			const display = idx > 0 ? `${idx}. ${details.answer}` : details.answer;
+			return new Text(theme.fg("success", "✓ ") + theme.fg("accent", display), 0, 0);
 		},
 	});
 }
