@@ -22,8 +22,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Key } from "@mariozechner/pi-tui";
 
-// Read-only tools for plan mode (+ question for clarifications, brave-search for research)
-const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "question", "brave-search"];
+// Read-only tools for plan mode (+ question for clarifications)
+const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "question"];
 
 // Full set of tools for normal mode
 const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
@@ -175,9 +175,19 @@ function cleanStepText(text: string): string {
 function extractTodoItems(message: string): TodoItem[] {
 	const items: TodoItem[] = [];
 
+	// Only extract from explicit plan sections - look for "Plan:" or "## Plan" headers
+	const planSectionPattern = /(?:^|\n)(?:#{1,3}\s*)?(?:\*{2})?Plan(?:\*{2})?[:\s]*\n([\s\S]*?)(?=\n#{1,3}\s|\n\*{2}[^*]+\*{2}:|\n---|\n$|$)/gi;
+	const planMatch = planSectionPattern.exec(message);
+	
+	if (!planMatch) {
+		return items; // No explicit plan section found
+	}
+
+	const planSection = planMatch[1];
+
 	// Match numbered lists: "1. Task" or "1) Task" - also handle **bold** prefixes
 	const numberedPattern = /^\s*(\d+)[.)]\s+\*{0,2}([^*\n]+)/gm;
-	for (const match of message.matchAll(numberedPattern)) {
+	for (const match of planSection.matchAll(numberedPattern)) {
 		let text = match[2].trim();
 		text = text.replace(/\*{1,2}$/, "").trim();
 		// Skip if too short or looks like code/command
@@ -185,21 +195,6 @@ function extractTodoItems(message: string): TodoItem[] {
 			const cleaned = cleanStepText(text);
 			if (cleaned.length > 3) {
 				items.push({ step: items.length + 1, text: cleaned, completed: false });
-			}
-		}
-	}
-
-	// If no numbered items, try bullet points
-	if (items.length === 0) {
-		const stepPattern = /^\s*[-*]\s*(?:Step\s*\d+[:.])?\s*\*{0,2}([^*\n]+)/gim;
-		for (const match of message.matchAll(stepPattern)) {
-			let text = match[1].trim();
-			text = text.replace(/\*{1,2}$/, "").trim();
-			if (text.length > 10 && !text.startsWith("`")) {
-				const cleaned = cleanStepText(text);
-				if (cleaned.length > 3) {
-					items.push({ step: items.length + 1, text: cleaned, completed: false });
-				}
 			}
 		}
 	}
@@ -364,7 +359,7 @@ export default function planModeExtension(pi: ExtensionAPI) {
 You are in plan mode - a read-only exploration mode for safe code analysis.
 
 Restrictions:
-- You can only use: read, bash, grep, find, ls, question, brave-search
+- You can only use: read, bash, grep, find, ls, question
 - You CANNOT use: edit, write (file modifications are disabled)
 - Bash is restricted to READ-ONLY commands
 - Focus on analysis, planning, and understanding the codebase
@@ -374,7 +369,7 @@ Ask clarifying questions as you plan:
 - If multiple questions are independent, you can ask them together
 - Prioritize questions that unlock more of the plan
 
-Use brave-search for researching documentation, APIs, or solutions online.
+Use brave-search skill via bash for web research (e.g., ~/.pi/agent/skills/brave-search/search.js "query").
 
 Create a detailed numbered plan:
 1. First step description
