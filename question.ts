@@ -1,6 +1,7 @@
 /**
- * Question Tool - Let the LLM ask the user a question with options
- * Supports multi-line input for "Other..." option with options visible
+ * Question Tool - Single question with options
+ * Full custom UI: options list + inline editor for "Other..."
+ * Escape in editor returns to options, Escape in options cancels
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -41,95 +42,148 @@ export default function question(pi: ExtensionAPI) {
 				};
 			}
 
-			// Add "Other..." option for free-text input
-			const optionsWithOther = [...params.options, "Other..."];
-			const answer = await ctx.ui.select(params.question, optionsWithOther);
+			// Build options with "Other..."
+			const allOptions = [...params.options, "Other..."];
 
-			if (answer === undefined) {
+			const result = await ctx.ui.custom<{ answer: string; wasCustom: boolean } | null>((tui, theme, _kb, done) => {
+				let optionIndex = 0;
+				let editMode = false;
+				let cachedLines: string[] | undefined;
+
+				const editorTheme: EditorTheme = {
+					borderColor: (s) => theme.fg("accent", s),
+					selectList: {
+						selectedPrefix: (t) => theme.fg("accent", t),
+						selectedText: (t) => theme.fg("accent", t),
+						description: (t) => theme.fg("muted", t),
+						scrollInfo: (t) => theme.fg("dim", t),
+						noMatch: (t) => theme.fg("warning", t),
+					},
+				};
+				const editor = new Editor(editorTheme);
+
+				editor.onSubmit = (value) => {
+					const trimmed = value.trim();
+					if (trimmed) {
+						done({ answer: trimmed, wasCustom: true });
+					} else {
+						// Empty submit - go back to options
+						editMode = false;
+						editor.setText("");
+						refresh();
+					}
+				};
+
+				function refresh() {
+					cachedLines = undefined;
+					tui.requestRender();
+				}
+
+				function handleInput(data: string) {
+					if (editMode) {
+						if (matchesKey(data, Key.escape)) {
+							// Return to options
+							editMode = false;
+							editor.setText("");
+							refresh();
+							return;
+						}
+						editor.handleInput(data);
+						refresh();
+						return;
+					}
+
+					// Options navigation
+					if (matchesKey(data, Key.up)) {
+						optionIndex = Math.max(0, optionIndex - 1);
+						refresh();
+						return;
+					}
+					if (matchesKey(data, Key.down)) {
+						optionIndex = Math.min(allOptions.length - 1, optionIndex + 1);
+						refresh();
+						return;
+					}
+
+					// Select option
+					if (matchesKey(data, Key.enter)) {
+						const selected = allOptions[optionIndex];
+						if (selected === "Other...") {
+							editMode = true;
+							refresh();
+						} else {
+							done({ answer: selected, wasCustom: false });
+						}
+						return;
+					}
+
+					// Cancel
+					if (matchesKey(data, Key.escape)) {
+						done(null);
+					}
+				}
+
+				function render(width: number): string[] {
+					if (cachedLines) return cachedLines;
+
+					const lines: string[] = [];
+					const add = (s: string) => lines.push(truncateToWidth(s, width));
+
+					add(theme.fg("accent", "─".repeat(width)));
+					add(theme.fg("text", " " + params.question));
+					lines.push("");
+
+					// Options
+					for (let i = 0; i < allOptions.length; i++) {
+						const opt = allOptions[i];
+						const selected = i === optionIndex;
+						const isOther = opt === "Other...";
+						const prefix = selected ? theme.fg("accent", "> ") : "  ";
+
+						if (isOther && editMode) {
+							add(prefix + theme.fg("accent", `${i + 1}. ${opt} ✎`));
+						} else if (selected) {
+							add(prefix + theme.fg("accent", `${i + 1}. ${opt}`));
+						} else {
+							add("  " + theme.fg("text", `${i + 1}. ${opt}`));
+						}
+					}
+
+					// Editor (only in edit mode)
+					if (editMode) {
+						lines.push("");
+						add(theme.fg("muted", " Your answer:"));
+						for (const line of editor.render(width - 2)) {
+							add(" " + line);
+						}
+					}
+
+					lines.push("");
+					if (editMode) {
+						add(theme.fg("dim", " Enter to submit • Esc to go back"));
+					} else {
+						add(theme.fg("dim", " ↑↓ navigate • Enter to select • Esc to cancel"));
+					}
+					add(theme.fg("accent", "─".repeat(width)));
+
+					cachedLines = lines;
+					return lines;
+				}
+
+				return { render, invalidate: () => { cachedLines = undefined; }, handleInput };
+			});
+
+			if (!result) {
 				return {
 					content: [{ type: "text", text: "User cancelled the selection" }],
 					details: { question: params.question, options: params.options, answer: null } as QuestionDetails,
 				};
 			}
 
-			// Handle "Other..." selection with multi-line editor
-			if (answer === "Other...") {
-				const customAnswer = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
-					let cachedLines: string[] | undefined;
-					
-					const editorTheme: EditorTheme = {
-						borderColor: (s) => theme.fg("accent", s),
-						selectList: {
-							selectedPrefix: (t) => theme.fg("accent", t),
-							selectedText: (t) => theme.fg("accent", t),
-							description: (t) => theme.fg("muted", t),
-							scrollInfo: (t) => theme.fg("dim", t),
-							noMatch: (t) => theme.fg("warning", t),
-						},
-					};
-					const editor = new Editor(editorTheme);
-					
-					editor.onSubmit = (value) => {
-						done(value.trim() || null);
-					};
-
-					function handleInput(data: string) {
-						if (matchesKey(data, Key.escape)) {
-							done(null);
-							return;
-						}
-						editor.handleInput(data);
-						cachedLines = undefined;
-						tui.requestRender();
-					}
-
-					function render(width: number): string[] {
-						if (cachedLines) return cachedLines;
-						
-						const lines: string[] = [];
-						const add = (s: string) => lines.push(truncateToWidth(s, width));
-
-						add(theme.fg("accent", "─".repeat(width)));
-						add(theme.fg("text", " " + params.question));
-						lines.push("");
-						
-						// Show options for reference
-						for (let i = 0; i < params.options.length; i++) {
-							add("  " + theme.fg("text", `${i + 1}. ${params.options[i]}`));
-						}
-						add("  " + theme.fg("accent", `${params.options.length + 1}. Other... ✎`));
-						
-						lines.push("");
-						add(theme.fg("muted", " Your answer:"));
-						for (const line of editor.render(width - 2)) {
-							add(" " + line);
-						}
-						lines.push("");
-						add(theme.fg("dim", " Enter to submit • Esc to cancel"));
-						add(theme.fg("accent", "─".repeat(width)));
-
-						cachedLines = lines;
-						return lines;
-					}
-
-					return { render, invalidate: () => { cachedLines = undefined; }, handleInput };
-				});
-
-				if (!customAnswer) {
-					return {
-						content: [{ type: "text", text: "User cancelled the input" }],
-						details: { question: params.question, options: params.options, answer: null, wasCustom: false } as QuestionDetails,
-					};
-				}
-				return {
-					content: [{ type: "text", text: `User wrote: ${customAnswer}` }],
-					details: { question: params.question, options: params.options, answer: customAnswer, wasCustom: true } as QuestionDetails,
-				};
-			}
-
+			const prefix = result.wasCustom ? "User wrote: " : "User selected: ";
 			return {
-				content: [{ type: "text", text: `User selected: ${answer}` }],
-				details: { question: params.question, options: params.options, answer } as QuestionDetails,
+				content: [{ type: "text", text: prefix + result.answer }],
+				details: { question: params.question, options: params.options, answer: result.answer, wasCustom: result.wasCustom } as QuestionDetails,
 			};
 		},
 
@@ -137,8 +191,7 @@ export default function question(pi: ExtensionAPI) {
 			let text = theme.fg("toolTitle", theme.bold("question ")) + theme.fg("muted", args.question);
 			const opts = Array.isArray(args.options) ? args.options : [];
 			if (opts.length) {
-				const displayOptions = [...opts, "Other..."];
-				text += `\n${theme.fg("dim", `  Options: ${displayOptions.join(", ")}`)}`;
+				text += `\n${theme.fg("dim", `  Options: ${[...opts, "Other..."].join(", ")}`)}`;
 			}
 			return new Text(text, 0, 0);
 		},
