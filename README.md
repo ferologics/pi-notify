@@ -4,12 +4,20 @@ A simple [Pi](https://github.com/badlogic/pi-mono) extension that sends a native
 
 Uses **OSC 777** escape sequence - no external dependencies.
 
-## Supported Terminals
+## Compatibility
 
-- Ghostty ✓
-- iTerm2 ✓
-- rxvt-unicode ✓
-- Any terminal supporting OSC 777
+OSC 777 is terminal-dependent, not OS-dependent. Works on macOS, Linux, etc. if your terminal supports it.
+
+| Terminal | Support | Notes |
+|----------|---------|-------|
+| Ghostty | ✓ | Native |
+| iTerm2 | ✓ | Native |
+| WezTerm | ✓ | Native |
+| rxvt-unicode | ✓ | Originated here |
+| Kitty | ✗ | Uses OSC 99 instead |
+| Terminal.app | ✗ | No support |
+| Windows Terminal | ✗ | No support |
+| Alacritty | ✗ | No support |
 
 ## Install
 
@@ -25,7 +33,7 @@ Or symlink for easy updates:
 ln -s /path/to/pi-notify/index.ts ~/.pi/agent/extensions/pi-notify.ts
 ```
 
-Add to `~/.pi/agent/settings.json`:
+Add to `~/.pi/agent/extensions` in `~/.pi/agent/settings.json`:
 
 ```json
 {
@@ -46,6 +54,12 @@ ESC ] 777 ; notify ; Pi ; Ready for input BEL
 ```
 
 The terminal interprets this and shows a native notification. Clicking the notification focuses the terminal window/tab.
+
+## What's OSC 777?
+
+OSC = Operating System Command, part of ANSI escape sequences. Terminals use these for things beyond text formatting (change title, colors, notifications, etc.).
+
+`777` is the number rxvt-unicode picked for notifications. Ghostty, iTerm2, WezTerm adopted it. Kitty went their own way with OSC 99.
 
 ## License
 
