@@ -8,6 +8,11 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
+interface OptionWithDesc {
+	label: string;
+	description?: string;
+}
+
 interface QuestionDetails {
 	question: string;
 	options: string[];
@@ -15,10 +20,27 @@ interface QuestionDetails {
 	wasCustom?: boolean;
 }
 
+// Support both simple strings and objects with descriptions
+const OptionSchema = Type.Union([
+	Type.String(),
+	Type.Object({
+		label: Type.String({ description: "Display label for the option" }),
+		description: Type.Optional(Type.String({ description: "Optional description shown below label" })),
+	}),
+]);
+
 const QuestionParams = Type.Object({
 	question: Type.String({ description: "The question to ask the user" }),
-	options: Type.Array(Type.String(), { description: "Options for the user to choose from" }),
+	options: Type.Array(OptionSchema, { description: "Options for the user to choose from" }),
 });
+
+// Normalize option to { label, description? }
+function normalizeOption(opt: string | { label: string; description?: string }): OptionWithDesc {
+	if (typeof opt === "string") {
+		return { label: opt };
+	}
+	return opt;
+}
 
 export default function question(pi: ExtensionAPI) {
 	pi.registerTool({
@@ -31,7 +53,7 @@ export default function question(pi: ExtensionAPI) {
 			if (!ctx.hasUI) {
 				return {
 					content: [{ type: "text", text: "Error: UI not available (running in non-interactive mode)" }],
-					details: { question: params.question, options: params.options, answer: null } as QuestionDetails,
+					details: { question: params.question, options: params.options.map(o => typeof o === "string" ? o : o.label), answer: null } as QuestionDetails,
 				};
 			}
 
@@ -42,8 +64,9 @@ export default function question(pi: ExtensionAPI) {
 				};
 			}
 
-			// Build options with "Other..."
-			const allOptions = [...params.options, "Other..."];
+			// Normalize options
+			const normalizedOptions = params.options.map(normalizeOption);
+			const allOptions: OptionWithDesc[] = [...normalizedOptions, { label: "Other..." }];
 
 			const result = await ctx.ui.custom<{ answer: string; wasCustom: boolean; index?: number } | null>((tui, theme, _kb, done) => {
 				let optionIndex = 0;
@@ -67,7 +90,6 @@ export default function question(pi: ExtensionAPI) {
 					if (trimmed) {
 						done({ answer: trimmed, wasCustom: true });
 					} else {
-						// Empty submit - go back to options
 						editMode = false;
 						editor.setText("");
 						refresh();
@@ -82,7 +104,6 @@ export default function question(pi: ExtensionAPI) {
 				function handleInput(data: string) {
 					if (editMode) {
 						if (matchesKey(data, Key.escape)) {
-							// Return to options
 							editMode = false;
 							editor.setText("");
 							refresh();
@@ -93,7 +114,6 @@ export default function question(pi: ExtensionAPI) {
 						return;
 					}
 
-					// Options navigation
 					if (matchesKey(data, Key.up)) {
 						optionIndex = Math.max(0, optionIndex - 1);
 						refresh();
@@ -105,19 +125,17 @@ export default function question(pi: ExtensionAPI) {
 						return;
 					}
 
-					// Select option
 					if (matchesKey(data, Key.enter)) {
 						const selected = allOptions[optionIndex];
-						if (selected === "Other...") {
+						if (selected.label === "Other...") {
 							editMode = true;
 							refresh();
 						} else {
-							done({ answer: selected, wasCustom: false, index: optionIndex + 1 });
+							done({ answer: selected.label, wasCustom: false, index: optionIndex + 1 });
 						}
 						return;
 					}
 
-					// Cancel
 					if (matchesKey(data, Key.escape)) {
 						done(null);
 					}
@@ -133,23 +151,26 @@ export default function question(pi: ExtensionAPI) {
 					add(theme.fg("text", " " + params.question));
 					lines.push("");
 
-					// Options
 					for (let i = 0; i < allOptions.length; i++) {
 						const opt = allOptions[i];
 						const selected = i === optionIndex;
-						const isOther = opt === "Other...";
+						const isOther = opt.label === "Other...";
 						const prefix = selected ? theme.fg("accent", "> ") : "  ";
 
 						if (isOther && editMode) {
-							add(prefix + theme.fg("accent", `${i + 1}. ${opt} ✎`));
+							add(prefix + theme.fg("accent", `${i + 1}. ${opt.label} ✎`));
 						} else if (selected) {
-							add(prefix + theme.fg("accent", `${i + 1}. ${opt}`));
+							add(prefix + theme.fg("accent", `${i + 1}. ${opt.label}`));
 						} else {
-							add("  " + theme.fg("text", `${i + 1}. ${opt}`));
+							add("  " + theme.fg("text", `${i + 1}. ${opt.label}`));
+						}
+						
+						// Show description if present
+						if (opt.description) {
+							add("     " + theme.fg("muted", opt.description));
 						}
 					}
 
-					// Editor (only in edit mode)
 					if (editMode) {
 						lines.push("");
 						add(theme.fg("muted", " Your answer:"));
@@ -173,22 +194,25 @@ export default function question(pi: ExtensionAPI) {
 				return { render, invalidate: () => { cachedLines = undefined; }, handleInput };
 			});
 
+			// Build simple options list for details
+			const simpleOptions = normalizedOptions.map(o => o.label);
+
 			if (!result) {
 				return {
 					content: [{ type: "text", text: "User cancelled the selection" }],
-					details: { question: params.question, options: params.options, answer: null } as QuestionDetails,
+					details: { question: params.question, options: simpleOptions, answer: null } as QuestionDetails,
 				};
 			}
 
 			if (result.wasCustom) {
 				return {
 					content: [{ type: "text", text: `User wrote: ${result.answer}` }],
-					details: { question: params.question, options: params.options, answer: result.answer, wasCustom: true } as QuestionDetails,
+					details: { question: params.question, options: simpleOptions, answer: result.answer, wasCustom: true } as QuestionDetails,
 				};
 			}
 			return {
 				content: [{ type: "text", text: `User selected: ${result.index}. ${result.answer}` }],
-				details: { question: params.question, options: params.options, answer: result.answer, wasCustom: false } as QuestionDetails,
+				details: { question: params.question, options: simpleOptions, answer: result.answer, wasCustom: false } as QuestionDetails,
 			};
 		},
 
@@ -196,7 +220,8 @@ export default function question(pi: ExtensionAPI) {
 			let text = theme.fg("toolTitle", theme.bold("question ")) + theme.fg("muted", args.question);
 			const opts = Array.isArray(args.options) ? args.options : [];
 			if (opts.length) {
-				const numbered = [...opts, "Other..."].map((o, i) => `${i + 1}. ${o}`);
+				const labels = opts.map((o: string | { label: string }) => typeof o === "string" ? o : o.label);
+				const numbered = [...labels, "Other..."].map((o, i) => `${i + 1}. ${o}`);
 				text += `\n${theme.fg("dim", `  Options: ${numbered.join(", ")}`)}`;
 			}
 			return new Text(text, 0, 0);
@@ -216,7 +241,6 @@ export default function question(pi: ExtensionAPI) {
 			if (details.wasCustom) {
 				return new Text(theme.fg("success", "✓ ") + theme.fg("muted", "(wrote) ") + theme.fg("accent", details.answer), 0, 0);
 			}
-			// Find the index of the selected option
 			const idx = details.options.indexOf(details.answer) + 1;
 			const display = idx > 0 ? `${idx}. ${details.answer}` : details.answer;
 			return new Text(theme.fg("success", "✓ ") + theme.fg("accent", display), 0, 0);
