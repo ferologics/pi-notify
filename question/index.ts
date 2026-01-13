@@ -13,6 +13,8 @@ interface OptionWithDesc {
 	description?: string;
 }
 
+type DisplayOption = OptionWithDesc & { isOther?: boolean };
+
 interface QuestionDetails {
 	question: string;
 	options: string[];
@@ -66,7 +68,7 @@ export default function question(pi: ExtensionAPI) {
 
 			// Normalize options
 			const normalizedOptions = params.options.map(normalizeOption);
-			const allOptions: OptionWithDesc[] = [...normalizedOptions, { label: "Other..." }];
+			const allOptions: DisplayOption[] = [...normalizedOptions, { label: "Other...", isOther: true }];
 
 			const result = await ctx.ui.custom<{ answer: string; wasCustom: boolean; index?: number } | null>((tui, theme, _kb, done) => {
 				let optionIndex = 0;
@@ -127,7 +129,7 @@ export default function question(pi: ExtensionAPI) {
 
 					if (matchesKey(data, Key.enter)) {
 						const selected = allOptions[optionIndex];
-						if (selected.label === "Other...") {
+						if (selected.isOther) {
 							editMode = true;
 							refresh();
 						} else {
@@ -154,7 +156,7 @@ export default function question(pi: ExtensionAPI) {
 					for (let i = 0; i < allOptions.length; i++) {
 						const opt = allOptions[i];
 						const selected = i === optionIndex;
-						const isOther = opt.label === "Other...";
+						const isOther = opt.isOther === true;
 						const prefix = selected ? theme.fg("accent", "> ") : "  ";
 
 						if (isOther && editMode) {

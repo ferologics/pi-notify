@@ -4,7 +4,7 @@ Custom extensions for [pi-coding-agent](https://github.com/badlogic/pi-mono).
 
 ## Extensions
 
-### question.ts
+### question
 
 Single question with options. Full custom UI with inline "Type something" editor.
 
@@ -26,7 +26,7 @@ Single question with options. Full custom UI with inline "Type something" editor
 ]}
 ```
 
-### questionnaire.ts
+### questionnaire
 
 Multi-question tool with tab navigation.
 
@@ -52,7 +52,7 @@ Multi-question tool with tab navigation.
 }
 ```
 
-### plan-mode.ts
+### plan-mode
 
 Read-only exploration mode for safe code analysis. Fork of pi's bundled plan-mode with customizations.
 
@@ -71,7 +71,7 @@ Read-only exploration mode for safe code analysis. Fork of pi's bundled plan-mod
 Symlink extensions to `~/.pi/agent/extensions/`:
 
 ```bash
-ln -s ~/.pi/repos/pi-extensions/question.ts ~/.pi/agent/extensions/
-ln -s ~/.pi/repos/pi-extensions/questionnaire.ts ~/.pi/agent/extensions/
-ln -s ~/.pi/repos/pi-extensions/plan-mode.ts ~/.pi/agent/extensions/
+ln -s ~/.pi/repos/pi-extensions/question ~/.pi/agent/extensions/
+ln -s ~/.pi/repos/pi-extensions/questionnaire ~/.pi/agent/extensions/
+ln -s ~/.pi/repos/pi-extensions/plan-mode ~/.pi/agent/extensions/
 ```

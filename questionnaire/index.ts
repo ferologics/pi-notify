@@ -16,6 +16,8 @@ interface QuestionOption {
 	description?: string;
 }
 
+type RenderOption = QuestionOption & { isOther?: boolean };
+
 interface Question {
 	id: string;
 	label: string;
@@ -125,12 +127,12 @@ export default function questionnaire(pi: ExtensionAPI) {
 					return questions[currentTab];
 				}
 
-				function currentOptions(): QuestionOption[] {
+				function currentOptions(): RenderOption[] {
 					const q = currentQuestion();
 					if (!q) return [];
-					const opts = [...q.options];
+					const opts: RenderOption[] = [...q.options];
 					if (q.allowOther) {
-						opts.push({ value: "__other__", label: "Type something." });
+						opts.push({ value: "__other__", label: "Type something.", isOther: true });
 					}
 					return opts;
 				}
@@ -227,7 +229,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 					// Select option
 					if (matchesKey(data, Key.enter) && q) {
 						const opt = opts[optionIndex];
-						if (opt.value === "__other__") {
+						if (opt.isOther) {
 							inputMode = true;
 							inputQuestionId = q.id;
 							editor.setText("");
@@ -283,7 +285,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 						for (let i = 0; i < opts.length; i++) {
 							const opt = opts[i];
 							const selected = i === optionIndex;
-							const isOther = opt.value === "__other__";
+							const isOther = opt.isOther === true;
 							const prefix = selected ? theme.fg("accent", "> ") : "  ";
 							const color = selected ? "accent" : "text";
 							// Mark "Type something" differently when in input mode

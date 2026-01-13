@@ -65,7 +65,7 @@ const DESTRUCTIVE_PATTERNS = [
 	/\b(vim?|nano|emacs|code|subl)\b/i,
 ];
 
-// Read-only commands that are always safe
+// Allowlisted read-only commands for plan mode
 const SAFE_COMMANDS = [
 	/^\s*cat\b/,
 	/^\s*head\b/,
@@ -120,15 +120,10 @@ const SAFE_COMMANDS = [
 ];
 
 function isSafeCommand(command: string): boolean {
-	if (SAFE_COMMANDS.some((pattern) => pattern.test(command))) {
-		if (!DESTRUCTIVE_PATTERNS.some((pattern) => pattern.test(command))) {
-			return true;
-		}
-	}
 	if (DESTRUCTIVE_PATTERNS.some((pattern) => pattern.test(command))) {
 		return false;
 	}
-	return true;
+	return SAFE_COMMANDS.some((pattern) => pattern.test(command));
 }
 
 // Todo item with step number
@@ -307,16 +302,17 @@ export default function planModeExtension(pi: ExtensionAPI) {
 		if (!isSafeCommand(command)) {
 			return {
 				block: true,
-				reason: `Plan mode: destructive command blocked. Use /plan to disable plan mode first.\nCommand: ${command}`,
+				reason: `Plan mode: command blocked (not allowlisted). Use /plan to disable plan mode first.\nCommand: ${command}`,
 			};
 		}
 	});
 
 	// Track step completion based on tool results
-	pi.on("tool_result", async (_event, ctx) => {
+	pi.on("tool_result", async (event, ctx) => {
 		toolsCalledThisTurn = true;
 
 		if (!executionMode || todoItems.length === 0) return;
+		if (event.isError) return;
 
 		// Mark the first uncompleted step as done when any tool succeeds
 		const nextStep = todoItems.find((t) => !t.completed);
@@ -364,7 +360,7 @@ You are in plan mode - a read-only exploration mode for safe code analysis.
 Restrictions:
 - You can only use: read, bash, grep, find, ls, questionnaire
 - You CANNOT use: edit, write (file modifications are disabled)
-- Bash is restricted to READ-ONLY commands
+- Bash is restricted to an allowlist of read-only commands
 - Focus on analysis, planning, and understanding the codebase
 
 Ask clarifying questions as you plan using the questionnaire tool:
