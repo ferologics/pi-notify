@@ -1,3 +1,8 @@
+---
+name: video-compress
+description: Compress videos to a target file size using ffmpeg two-pass encoding. Useful for Discord/Slack upload limits.
+---
+
 # Video Compress Skill
 
 Compress videos to a target file size using ffmpeg two-pass encoding.
