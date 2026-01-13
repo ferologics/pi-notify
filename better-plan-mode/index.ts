@@ -411,24 +411,40 @@ After completing a step, include a [DONE:n] tag in your response.`,
 	pi.on("agent_end", async (event, ctx) => {
 		// In execution mode, check if all steps complete
 		if (executionMode && todoItems.length > 0) {
-			const lastAssistant = [...event.messages].reverse().find((m) => m.role === "assistant");
-			if (lastAssistant && Array.isArray(lastAssistant.content)) {
-				const textContent = lastAssistant.content
-					.filter((block): block is { type: "text"; text: string } => block.type === "text")
-					.map((block) => block.text)
-					.join("\n");
+			// Find all assistant messages since the last user message
+			// (a single turn can have multiple assistant messages due to tool calls)
+			const messages = event.messages;
+			let lastUserIndex = -1;
+			for (let i = messages.length - 1; i >= 0; i--) {
+				if (messages[i].role === "user") {
+					lastUserIndex = i;
+					break;
+				}
+			}
 
-				if (textContent) {
-					const doneSteps = extractDoneSteps(textContent);
-					if (doneSteps.length > 0) {
-						for (const step of doneSteps) {
-							const item = todoItems.find((t) => t.step === step);
-							if (item) {
-								item.completed = true;
-							}
+			// Collect text from all assistant messages in this turn
+			const allTextContent: string[] = [];
+			for (let i = lastUserIndex + 1; i < messages.length; i++) {
+				const msg = messages[i];
+				if (msg.role === "assistant" && Array.isArray(msg.content)) {
+					const texts = msg.content
+						.filter((block): block is { type: "text"; text: string } => block.type === "text")
+						.map((block) => block.text);
+					allTextContent.push(...texts);
+				}
+			}
+
+			const textContent = allTextContent.join("\n");
+			if (textContent) {
+				const doneSteps = extractDoneSteps(textContent);
+				if (doneSteps.length > 0) {
+					for (const step of doneSteps) {
+						const item = todoItems.find((t) => t.step === step);
+						if (item) {
+							item.completed = true;
 						}
-						updateStatus(ctx);
 					}
+					updateStatus(ctx);
 				}
 			}
 
