@@ -1,0 +1,26 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 120
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "suspicious": {
+                "noExplicitAny": "off"
+            },
+            "style": {
+                "noNonNullAssertion": "off",
+                "useTemplate": "off"
+            }
+        }
+    },
+    "files": {
+        "includes": ["**/*.ts"],
+        "ignoreUnknown": true
+    }
+}
