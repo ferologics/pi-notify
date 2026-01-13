@@ -49,7 +49,7 @@ const QuestionOptionSchema = Type.Object({
 
 const QuestionSchema = Type.Object({
 	id: Type.String({ description: "Unique identifier for this question" }),
-	label: Type.Optional(Type.String({ description: "Short label for tab bar (defaults to Q1, Q2, etc.)" })),
+	label: Type.Optional(Type.String({ description: "Short contextual label for tab bar, e.g. 'Scope', 'Priority' (defaults to Q1, Q2)" })),
 	prompt: Type.String({ description: "The full question text to display" }),
 	options: Type.Array(QuestionOptionSchema, { description: "Available options to choose from" }),
 	allowOther: Type.Optional(Type.Boolean({ description: "Allow 'Type something' option (default: true)" })),
@@ -84,7 +84,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 			// Normalize questions with defaults
 			const questions: Question[] = params.questions.map((q, i) => ({
 				...q,
-				label: q.label || truncateToWidth(q.prompt, 20) || `Q${i + 1}`,
+				label: q.label || `Q${i + 1}`,
 				allowOther: q.allowOther !== false,
 			}));
 
