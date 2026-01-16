@@ -8,6 +8,9 @@
 - Allow referencing of files in plan refinement editor
 - Allow find tool use in plan mode
 - Questionnaire options can mark a choice as `(recommended)`
+- Questionnaire question text gets truncated; render multiline/compact so full prompt is readable
+- Questionnaire prompt: model misreads "Type something" and suggests "Other (describe)"; prompt should steer to typed answer handling / accept variants
+- Plan-mode todo widget lines are truncated; render multiline/compact so full items are readable
 
 ## Explore: Replace built-in todos with file-based tracking
 
