@@ -115,38 +115,81 @@ async function main() {
         outputDir = resolve(args[outputIdx + 1]);
     }
 
+    const patternIdx = args.indexOf("--pattern");
+    let pattern = null;
+    if (patternIdx !== -1 && args[patternIdx + 1]) {
+        pattern = args[patternIdx + 1];
+    }
+
     const flagIndices = new Set();
     flagIndices.add(args.indexOf("--analyze"));
     if (outputIdx !== -1) {
         flagIndices.add(outputIdx);
         flagIndices.add(outputIdx + 1);
     }
+    if (patternIdx !== -1) {
+        flagIndices.add(patternIdx);
+        flagIndices.add(patternIdx + 1);
+    }
     const cwdArg = args.find((a, i) => !flagIndices.has(i) && !a.startsWith("--"));
-    const cwd = resolve(cwdArg || process.cwd());
 
     mkdirSync(outputDir, { recursive: true });
     const sessionsBase = join(homedir(), ".pi/agent/sessions");
-    const sessionDirName = cwdToSessionDir(cwd);
-    const sessionDir = join(sessionsBase, sessionDirName);
 
-    if (!existsSync(sessionDir)) {
-        console.error(`No sessions found for ${cwd}`);
-        console.error(`Expected: ${sessionDir}`);
-        process.exit(1);
+    // Find matching session directories
+    let sessionDirs = [];
+    if (pattern) {
+        // Pattern mode: find all session dirs matching the pattern
+        const allDirs = readdirSync(sessionsBase).filter((d) => {
+            const fullPath = join(sessionsBase, d);
+            return existsSync(fullPath) && readdirSync(fullPath).some((f) => f.endsWith(".jsonl"));
+        });
+        sessionDirs = allDirs
+            .filter((d) => d.toLowerCase().includes(pattern.toLowerCase()))
+            .map((d) => join(sessionsBase, d));
+
+        if (sessionDirs.length === 0) {
+            console.error(`No sessions found matching pattern "${pattern}"`);
+            console.error(`Available session dirs:`);
+            allDirs.slice(0, 10).forEach((d) => console.error(`  ${d}`));
+            if (allDirs.length > 10) console.error(`  ... and ${allDirs.length - 10} more`);
+            process.exit(1);
+        }
+        console.log(`Found ${sessionDirs.length} session dir(s) matching "${pattern}":`);
+        sessionDirs.forEach((d) => console.log(`  ${d.replace(sessionsBase + "/", "")}`));
+    } else {
+        // Single cwd mode (original behavior)
+        const cwd = resolve(cwdArg || process.cwd());
+        const sessionDirName = cwdToSessionDir(cwd);
+        const sessionDir = join(sessionsBase, sessionDirName);
+
+        if (!existsSync(sessionDir)) {
+            console.error(`No sessions found for ${cwd}`);
+            console.error(`Expected: ${sessionDir}`);
+            console.error(`\nTip: Use --pattern <substring> to match multiple session dirs`);
+            process.exit(1);
+        }
+        sessionDirs = [sessionDir];
     }
 
-    const sessionFiles = readdirSync(sessionDir)
-        .filter((f) => f.endsWith(".jsonl"))
-        .sort();
+    // Collect all session files from all matching dirs
+    const sessionFiles = [];
+    for (const dir of sessionDirs) {
+        const files = readdirSync(dir)
+            .filter((f) => f.endsWith(".jsonl"))
+            .map((f) => ({ dir, file: f, path: join(dir, f) }));
+        sessionFiles.push(...files);
+    }
+    sessionFiles.sort((a, b) => a.file.localeCompare(b.file));
 
-    console.log(`Found ${sessionFiles.length} session files in ${sessionDir}`);
+    console.log(`Found ${sessionFiles.length} total session files`);
 
     const allTranscripts = [];
-    for (const file of sessionFiles) {
-        const filePath = join(sessionDir, file);
+    for (const { dir, file, path: filePath } of sessionFiles) {
         const messages = parseSession(filePath);
         if (messages.length > 0) {
-            allTranscripts.push(`=== SESSION: ${file} ===\n${messages.join("\n---\n")}\n=== END SESSION ===`);
+            const dirLabel = pattern ? `${dir.replace(sessionsBase + "/", "")}/${file}` : file;
+            allTranscripts.push(`=== SESSION: ${dirLabel} ===\n${messages.join("\n---\n")}\n=== END SESSION ===`);
         }
     }
 

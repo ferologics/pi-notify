@@ -16,8 +16,14 @@ Extracts and analyzes your pi session transcripts to find recurring patterns tha
 # Extract transcripts for specific directory
 {baseDir}/analyze.js /path/to/project
 
+# Match multiple dirs by pattern (worktrees, variants, etc.)
+{baseDir}/analyze.js --pattern orders-app
+
 # Extract + analyze with subagents
 {baseDir}/analyze.js --analyze
+
+# Pattern + analyze (finds all matching session dirs)
+{baseDir}/analyze.js --pattern orders-app --analyze
 
 # Custom output directory
 {baseDir}/analyze.js --output ./my-analysis --analyze
@@ -26,6 +32,7 @@ Extracts and analyzes your pi session transcripts to find recurring patterns tha
 ## What It Does
 
 1. **Extract**: Reads all session files for the given working directory from `~/.pi/agent/sessions/`
+   - Use `--pattern` to match multiple directories (e.g., worktrees, feature branches)
 2. **Split**: Chunks transcripts into ~100k char files (fits in context window)
 3. **Analyze** (optional): Spawns pi subagents to identify:
    - **AGENTS.md patterns**: Coding style rules, conventions you repeat
