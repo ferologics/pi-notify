@@ -1,0 +1,20 @@
+{
+  "name": "pi-skills",
+  "version": "1.0.0",
+  "description": "Custom skills for Pi coding agent",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "pi": {
+    "skills": [
+      "brave-search",
+      "code-review",
+      "code-review-parallel",
+      "code-simplifier",
+      "deep-review",
+      "markdown-converter",
+      "session-analyzer",
+      "video-compress",
+      "youtube-transcript"
+    ]
+  }
+}
