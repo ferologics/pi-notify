@@ -8,50 +8,48 @@ My custom skills for [Pi](https://github.com/badlogic/pi-mono).
 |-------|-------------|--------|
 | [**brave-search**](./brave-search/) | Web search via Brave Search API | [badlogic/pi-skills](https://github.com/badlogic/pi-skills/tree/main/brave-search) |
 | [**code-review**](./code-review/) | Local PR review for bugs, style, guidelines | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-review) |
-| [**code-review-parallel**](./code-review-parallel/) | [WIP] Parallel PR review with subagents | Original |
 | [**code-simplifier**](./code-simplifier/) | Simplify/refine code for clarity | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-simplifier) |
 | [**markdown-converter**](./markdown-converter/) | Convert files to Markdown via `uvx markitdown` | [steipete/agent-scripts](https://github.com/steipete/agent-scripts/tree/main/skills/markdown-converter) |
+| [**multi-review**](./multi-review/) | 3-model parallel PR review, then synthesize | Original |
 | [**session-analyzer**](./session-analyzer/) | Mine session transcripts for automation patterns | [badlogic gist](https://gist.github.com/badlogic/55d996b4afc4bd084ce55bb8ddd34594) |
 | [**video-compress**](./video-compress/) | Compress videos to target size via `ffmpeg` | Original |
 | [**youtube-transcript**](./youtube-transcript/) | Fetch YouTube transcripts (any language) via `yt-dlp` | Original |
 
 ## Install
 
-Symlink skills to Pi:
+Add to `~/.pi/agent/settings.json`:
 
-```bash
-ln -sf /path/to/pi-skills/brave-search ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/code-review ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/code-simplifier ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/markdown-converter ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/session-analyzer ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/video-compress ~/.pi/agent/skills/
-ln -sf /path/to/pi-skills/youtube-transcript ~/.pi/agent/skills/
+```json
+{
+  "packages": [
+    "~/dev/pi-skills"
+  ]
+}
 ```
 
-For brave-search:
-```bash
-cd /path/to/pi-skills/brave-search && npm install
-```
+### Dependencies
 
-For session-analyzer:
-```bash
-cd /path/to/pi-skills/session-analyzer && npm install
-```
+Some skills need extra setup:
 
-For video-compress:
 ```bash
+# brave-search
+cd ~/dev/pi-skills/brave-search && npm install
+# Also set BRAVE_API_KEY env var
+
+# session-analyzer
+cd ~/dev/pi-skills/session-analyzer && npm install
+
+# video-compress
 brew install ffmpeg
-```
 
-For youtube-transcript:
-```bash
+# youtube-transcript
 brew install yt-dlp jq
 ```
 
 ## Disable per-repo
 
 Add to `.pi/settings.json` in any repo:
+
 ```json
 {
   "ignoredSkills": ["*"]

@@ -8,10 +8,9 @@
     "skills": [
       "brave-search",
       "code-review",
-      "code-review-parallel",
       "code-simplifier",
-      "deep-review",
       "markdown-converter",
+      "multi-review",
       "session-analyzer",
       "video-compress",
       "youtube-transcript"
