@@ -39,6 +39,10 @@ OSC = Operating System Command, part of ANSI escape sequences. Terminals use the
 
 `777` is the number rxvt-unicode picked for notifications. Ghostty, iTerm2, WezTerm adopted it. Kitty uses `99` with a more extensible protocol.
 
+## Known Limitations
+
+Terminal multiplexers (zellij, tmux, screen) create their own PTY and typically don't pass through OSC notification sequences. Run pi directly in your terminal for notifications to work.
+
 ## License
 
 MIT
