@@ -43,7 +43,10 @@ compress.sh photo.png out.jpg --format jpeg --quality 95
 ## How it works
 
 1. Gets current dimensions and file size
-2. If format conversion requested, converts first
-3. Calculates required scale factor to hit target size
-4. Iteratively resizes until under target (binary search approach)
-5. Reports final dimensions and size
+2. Strips ICC color profile (avoids sips warnings)
+3. If format conversion requested, converts first
+4. Calculates required scale factor to hit target size
+5. Iteratively resizes until under target (binary search approach)
+6. Reports final dimensions and size
+
+**Note:** Uses decimal MB (1 MB = 1,000,000 bytes) to match Finder.

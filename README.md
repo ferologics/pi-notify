@@ -9,6 +9,7 @@ My custom skills for [Pi](https://github.com/badlogic/pi-mono).
 | [**brave-search**](./brave-search/) | Web search via Brave Search API | [badlogic/pi-skills](https://github.com/badlogic/pi-skills/tree/main/brave-search) |
 | [**code-review**](./code-review/) | Local PR review for bugs, style, guidelines | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-review) |
 | [**code-simplifier**](./code-simplifier/) | Simplify/refine code for clarity | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-simplifier) |
+| [**image-compress**](./image-compress/) | Compress images to target size via `sips` | Original |
 | [**markdown-converter**](./markdown-converter/) | Convert files to Markdown via `uvx markitdown` | [steipete/agent-scripts](https://github.com/steipete/agent-scripts/tree/main/skills/markdown-converter) |
 | [**multi-review**](./multi-review/) | 3-model parallel PR review, then synthesize | Original |
 | [**session-analyzer**](./session-analyzer/) | Mine session transcripts for automation patterns | [badlogic gist](https://gist.github.com/badlogic/55d996b4afc4bd084ce55bb8ddd34594) |
