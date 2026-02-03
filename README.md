@@ -52,12 +52,8 @@ brew install yt-dlp jq
 
 ## Disable per-repo
 
-Add to `.pi/settings.json` in any repo:
-
-```json
-{
-  "ignoredSkills": ["*"]
-}
+```bash
+pi config set ignoredSkills '["*"]'
 ```
 
 ## License
