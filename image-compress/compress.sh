@@ -69,10 +69,10 @@ if [[ -z "$OUTPUT" ]]; then
 fi
 
 # Get current dimensions
-ORIG_WIDTH=$(sips -g pixelWidth "$INPUT" | tail -1 | awk '{print $2}')
-ORIG_HEIGHT=$(sips -g pixelHeight "$INPUT" | tail -1 | awk '{print $2}')
+ORIG_WIDTH=$(sips -g pixelWidth "$INPUT" 2>/dev/null | tail -1 | awk '{print $2}')
+ORIG_HEIGHT=$(sips -g pixelHeight "$INPUT" 2>/dev/null | tail -1 | awk '{print $2}')
 ORIG_SIZE=$(stat -f%z "$INPUT")
-ORIG_SIZE_MB=$(echo "scale=2; $ORIG_SIZE / 1048576" | bc)
+ORIG_SIZE_MB=$(echo "scale=2; $ORIG_SIZE / 1000000" | bc)
 
 echo "Input: $INPUT"
 echo "Dimensions: ${ORIG_WIDTH} × ${ORIG_HEIGHT}"
@@ -80,8 +80,8 @@ echo "Size: ${ORIG_SIZE_MB}MB"
 echo "Target: ${TARGET_MB}MB"
 echo ""
 
-# Target in bytes
-TARGET_BYTES=$(echo "$TARGET_MB * 1048576" | bc | cut -d. -f1)
+# Target in bytes (using decimal MB to match Finder)
+TARGET_BYTES=$(echo "$TARGET_MB * 1000000" | bc | cut -d. -f1)
 
 # Create temp file for working
 TEMP_FILE=$(mktemp /tmp/img_compress.XXXXXX)
@@ -101,6 +101,9 @@ fi
 CURRENT_SIZE=$(stat -f%z "$TEMP_FILE")
 CURRENT_WIDTH=$ORIG_WIDTH
 
+# Strip color profile to avoid sips warnings
+sips --deleteColorManagementProperties "$TEMP_FILE" --out "$TEMP_FILE" >/dev/null 2>&1 || true
+
 # If user specified width, apply it first
 if [[ -n "$WIDTH" ]]; then
     echo "Resizing to width ${WIDTH}..."
@@ -113,9 +116,9 @@ fi
 if [[ $CURRENT_SIZE -le $TARGET_BYTES ]]; then
     cp "$TEMP_FILE" "$OUTPUT"
     FINAL_SIZE=$(stat -f%z "$OUTPUT")
-    FINAL_SIZE_MB=$(echo "scale=2; $FINAL_SIZE / 1048576" | bc)
-    FINAL_WIDTH=$(sips -g pixelWidth "$OUTPUT" | tail -1 | awk '{print $2}')
-    FINAL_HEIGHT=$(sips -g pixelHeight "$OUTPUT" | tail -1 | awk '{print $2}')
+    FINAL_SIZE_MB=$(echo "scale=2; $FINAL_SIZE / 1000000" | bc)
+    FINAL_WIDTH=$(sips -g pixelWidth "$OUTPUT" 2>/dev/null | tail -1 | awk '{print $2}')
+    FINAL_HEIGHT=$(sips -g pixelHeight "$OUTPUT" 2>/dev/null | tail -1 | awk '{print $2}')
     echo "Done: $OUTPUT"
     echo "Final: ${FINAL_WIDTH} × ${FINAL_HEIGHT}, ${FINAL_SIZE_MB}MB"
     exit 0
@@ -155,9 +158,9 @@ fi
 
 # Report
 FINAL_SIZE=$(stat -f%z "$OUTPUT")
-FINAL_SIZE_MB=$(echo "scale=2; $FINAL_SIZE / 1048576" | bc)
-FINAL_WIDTH=$(sips -g pixelWidth "$OUTPUT" | tail -1 | awk '{print $2}')
-FINAL_HEIGHT=$(sips -g pixelHeight "$OUTPUT" | tail -1 | awk '{print $2}')
+FINAL_SIZE_MB=$(echo "scale=2; $FINAL_SIZE / 1000000" | bc)
+FINAL_WIDTH=$(sips -g pixelWidth "$OUTPUT" 2>/dev/null | tail -1 | awk '{print $2}')
+FINAL_HEIGHT=$(sips -g pixelHeight "$OUTPUT" 2>/dev/null | tail -1 | awk '{print $2}')
 
 echo ""
 echo "Done: $OUTPUT"
