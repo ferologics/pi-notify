@@ -50,12 +50,6 @@ brew install ffmpeg
 brew install yt-dlp jq
 ```
 
-## Disable per-repo
-
-```bash
-pi config set ignoredSkills '["*"]'
-```
-
 ## License
 
 MIT (except where noted from source)
