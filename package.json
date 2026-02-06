@@ -13,6 +13,7 @@
       "brave-search",
       "code-review",
       "code-simplifier",
+      "context-packer",
       "image-compress",
       "markdown-converter",
       "multi-review",

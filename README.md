@@ -9,6 +9,7 @@ My custom skills for [Pi](https://github.com/badlogic/pi-mono).
 | [**brave-search**](./brave-search/) | Web search via Brave Search API | [badlogic/pi-skills](https://github.com/badlogic/pi-skills/tree/main/brave-search) |
 | [**code-review**](./code-review/) | Local PR review for bugs, style, guidelines | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-review) |
 | [**code-simplifier**](./code-simplifier/) | Simplify/refine code for clarity | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-simplifier) |
+| [**context-packer**](./context-packer/) | Build LLM-ready code dumps and count tokens with `o200k-base` | Original |
 | [**image-compress**](./image-compress/) | Compress images to target size via `sips` | Original |
 | [**markdown-converter**](./markdown-converter/) | Convert files to Markdown via `uvx markitdown` | [steipete/agent-scripts](https://github.com/steipete/agent-scripts/tree/main/skills/markdown-converter) |
 | [**multi-review**](./multi-review/) | 3-model parallel PR review, then synthesize | Original |
@@ -36,6 +37,11 @@ Some skills need extra setup:
 # brave-search
 cd ~/dev/pi-skills/brave-search && npm install
 # Also set BRAVE_API_KEY env var
+
+# context-packer
+cargo install tokencount
+# Optional helper: https://github.com/tulushev/copy_files
+# Optional: pbcopy (macOS) or wl-copy (Linux) for clipboard copy
 
 # image-compress
 # No deps - uses macOS built-in sips
