@@ -40,7 +40,6 @@ cd ~/dev/pi-skills/brave-search && npm install
 
 # context-packer
 cargo install tokencount
-# Optional helper: https://github.com/tulushev/copy_files
 # Optional: pbcopy (macOS) or wl-copy (Linux) for clipboard copy
 
 # image-compress

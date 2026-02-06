@@ -66,7 +66,6 @@ $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --fail-over-budg
 ## Requirements
 
 - `tokencount` installed (`cargo install tokencount`)
-- Optional helper utility: [`copy_files`](https://github.com/tulushev/copy_files) (not required by this skill)
 - Optional clipboard tools:
   - macOS: `pbcopy`
   - Linux Wayland: `wl-copy`
