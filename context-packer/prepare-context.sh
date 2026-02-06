@@ -4,9 +4,11 @@ set -euo pipefail
 PROJECT_DIR="$(pwd)"
 OUTPUT_NAME="context-dump.txt"
 BUDGET=272000
-WITH_DOCS=false
-WITH_TESTS=false
+WITH_DOCS=true
+WITH_TESTS=true
 INCLUDE_LOCKFILES=false
+INCLUDE_ENV=false
+INCLUDE_SECRETS=false
 NO_CLIPBOARD=false
 FAIL_OVER_BUDGET=false
 INSTALL_TOOLS=false
@@ -21,17 +23,23 @@ Usage:
 Options:
     --output <name>           Output filename inside <project_dir>/prompt (default: context-dump.txt)
     --budget <tokens>         Token budget threshold (default: 272000)
-    --with-docs               Include docs/ directory
-    --with-tests              Include test files (__tests__, *.test.*, *.spec.*)
+    --with-docs               Include docs/ directory (default: on)
+    --with-tests              Include test files (__tests__, tests/, test/, *.test.*, *.spec.*, etc.) (default: on)
+    --no-docs                 Exclude docs/ directory
+    --no-tests                Exclude test files (__tests__, tests/, test/, *.test.*, *.spec.*, etc.)
     --include-lockfiles       Include lockfiles (pnpm-lock.yaml, Cargo.lock, etc.)
+    --include-env             Include env files (.env, .env.*, .envrc) (default: off)
+    --include-secrets         Include potentially sensitive files (.npmrc, keys/certs, etc.) (default: off)
     --no-clipboard            Do not place final output into clipboard
     --fail-over-budget        Exit with code 2 when tokens exceed budget
     --install-tools           Install missing tools (tokencount via cargo)
     -h, --help                Show this help
 
 Examples:
-    prepare-context.sh ~/dev/pui --with-docs
-    prepare-context.sh ~/dev/pui --with-docs --budget 272000 --output pui-gpt5.txt
+    prepare-context.sh ~/dev/pui
+    prepare-context.sh ~/dev/pui --no-docs --no-tests
+    prepare-context.sh ~/dev/pui --include-env --include-secrets
+    prepare-context.sh ~/dev/pui --budget 272000 --output pui-gpt5.txt
 EOF
 }
 
@@ -42,13 +50,13 @@ command_exists() {
 is_allowed_extension() {
     local rel="$1"
     case "$rel" in
-        *.rs|*.zig|*.c|*.h|*.cpp|*.hpp|*.m|*.mm|*.swift|*.kt|*.java|*.py|*.go|*.rb|*.php|*.cs|*.lua|\
+        *.rs|*.zig|*.c|*.h|*.cpp|*.hpp|*.cc|*.hh|*.m|*.mm|*.swift|*.kt|*.kts|*.java|*.py|*.go|*.rb|*.php|*.cs|*.fs|*.lua|*.r|\
         *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.svelte|*.vue|\
-        *.css|*.scss|*.sass|*.less|*.html|*.htm|*.svg|*.xml|\
-        *.json|*.toml|*.yaml|*.yml|*.ini|*.env|\
-        *.md|*.txt|\
-        *.sh|*.bash|*.zsh|*.fish|\
-        *.sql|*.graphql)
+        *.css|*.scss|*.sass|*.less|*.html|*.htm|*.svg|*.xml|*.xsd|*.xsl|\
+        *.json|*.jsonc|*.toml|*.yaml|*.yml|*.ini|*.cfg|*.conf|*.properties|\
+        *.md|*.mdx|*.rst|*.txt|\
+        *.sh|*.bash|*.zsh|*.fish|*.ps1|\
+        *.sql|*.graphql|*.gql|*.proto|*.tf|*.tfvars|*.cmake|*.gradle)
             return 0
             ;;
         *)
@@ -59,10 +67,109 @@ is_allowed_extension() {
 
 is_explicit_include() {
     local rel="$1"
+    local base
+    base="$(basename "$rel")"
+
+    case "$base" in
+        Dockerfile|Containerfile|Makefile|GNUmakefile|justfile|Justfile|Procfile|Procfile.*|\
+        Brewfile|Gemfile|Gemfile.*|Rakefile|Rakefile.*|Vagrantfile|\
+        CMakeLists.txt|meson.build|meson_options.txt|BUILD|BUILD.bazel|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|\
+        Jenkinsfile|Tiltfile|Podfile|Cartfile|Fastfile|flake.nix|default.nix|shell.nix|Taskfile)
+            return 0
+            ;;
+        .editorconfig|.gitignore|.gitattributes|.dockerignore|\
+        .npmrc|.nvmrc|.prettierignore|.prettierrc|.eslintignore|\
+        .tool-versions|.python-version|.ruby-version|.node-version|.terraform.lock.hcl)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_lockfile() {
+    local rel="$1"
     case "$rel" in
-        package.json|svelte.config.js|tailwind.config.ts|tsconfig.json|vite.config.js|biome.json|dprint.json|components.json|\
-        rustfmt.toml|mise.toml|README.md|AGENTS.md|TODO.md|.gitignore|.gitattributes|\
-        src-tauri/Cargo.toml|src-tauri/tauri.conf.json|src-tauri/build.rs|src-tauri/capabilities/default.json)
+        pnpm-lock.yaml|*/pnpm-lock.yaml|\
+        package-lock.json|*/package-lock.json|\
+        yarn.lock|*/yarn.lock|\
+        bun.lock|*/bun.lock|bun.lockb|*/bun.lockb|\
+        npm-shrinkwrap.json|*/npm-shrinkwrap.json|\
+        Cargo.lock|*/Cargo.lock|\
+        composer.lock|*/composer.lock|\
+        Gemfile.lock|*/Gemfile.lock|\
+        poetry.lock|*/poetry.lock|\
+        Pipfile.lock|*/Pipfile.lock)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_env_path() {
+    local rel="$1"
+    case "$rel" in
+        .env|.env.*|*/.env|*/.env.*|.envrc|*/.envrc)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_secret_path() {
+    local rel="$1"
+    local base
+    base="$(basename "$rel")"
+
+    case "$rel" in
+        .npmrc|*/.npmrc|.pypirc|*/.pypirc|.netrc|*/.netrc|\
+        .aws/credentials|*/.aws/credentials|.aws/config|*/.aws/config|\
+        .gem/credentials|*/.gem/credentials)
+            return 0
+            ;;
+    esac
+
+    case "$base" in
+        id_rsa|id_dsa|id_ecdsa|id_ed25519|\
+        google-services.json|GoogleService-Info.plist|\
+        firebase-adminsdk*.json|*service-account*.json|*serviceaccount*.json)
+            return 0
+            ;;
+    esac
+
+    case "$rel" in
+        *.pem|*.key|*.p12|*.pfx|*.jks|*.keystore|*.kdbx|*.pkcs12|*.der|*.crt|*.cer|*.csr|\
+        *.mobileprovision|*.provisionprofile)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+is_docs_path() {
+    local rel="$1"
+    case "$rel" in
+        docs/*|*/docs/*|doc/*|*/doc/*|documentation/*|*/documentation/*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_test_path() {
+    local rel="$1"
+    case "$rel" in
+        __tests__/*|*/__tests__/*|\
+        test/*|*/test/*|tests/*|*/tests/*|\
+        *.test.*|*.spec.*|*_test.*|test_*.py)
             return 0
             ;;
         *)
@@ -75,7 +182,17 @@ is_excluded_path() {
     local rel="$1"
 
     case "$rel" in
-        .git/*|node_modules/*|prompt/*|.svelte-kit/*|src-tauri/gen/*|src-tauri/icons/*)
+        .git/*|*/.git/*|.hg/*|*/.hg/*|.svn/*|*/.svn/*|\
+        node_modules/*|*/node_modules/*|\
+        prompt/*|*/prompt/*|\
+        dist/*|*/dist/*|build/*|*/build/*|target/*|*/target/*|out/*|*/out/*|coverage/*|*/coverage/*|\
+        .next/*|*/.next/*|.nuxt/*|*/.nuxt/*|.svelte-kit/*|*/.svelte-kit/*|.turbo/*|*/.turbo/*|\
+        .cache/*|*/.cache/*|.parcel-cache/*|*/.parcel-cache/*|\
+        .venv/*|*/.venv/*|venv/*|*/venv/*|\
+        __pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*|.mypy_cache/*|*/.mypy_cache/*|\
+        .terraform/*|*/.terraform/*|.direnv/*|*/.direnv/*|\
+        .gradle/*|*/.gradle/*|.idea/*|*/.idea/*|\
+        *.egg-info/*|*/*.egg-info/*)
             return 0
             ;;
     esac
@@ -86,43 +203,50 @@ is_excluded_path() {
             ;;
     esac
 
-    if [[ "$INCLUDE_LOCKFILES" != true ]]; then
-        case "$rel" in
-            pnpm-lock.yaml|package-lock.json|yarn.lock|Cargo.lock|src-tauri/Cargo.lock)
-                return 0
-                ;;
-        esac
+    if [[ "$INCLUDE_LOCKFILES" != true ]] && is_lockfile "$rel"; then
+        return 0
     fi
 
-    if [[ "$WITH_TESTS" != true ]]; then
-        case "$rel" in
-            *__tests__/*|*.test.*|*.spec.*)
-                return 0
-                ;;
-        esac
+    if [[ "$INCLUDE_ENV" != true ]] && is_env_path "$rel"; then
+        return 0
+    fi
+
+    if [[ "$INCLUDE_SECRETS" != true ]] && is_secret_path "$rel"; then
+        return 0
     fi
 
     return 1
 }
 
-is_included_by_scope() {
+is_included_file() {
     local rel="$1"
+
+    if [[ "$WITH_DOCS" != true ]] && is_docs_path "$rel"; then
+        return 1
+    fi
+
+    if [[ "$WITH_TESTS" != true ]] && is_test_path "$rel"; then
+        return 1
+    fi
+
+    if [[ "$INCLUDE_LOCKFILES" == true ]] && is_lockfile "$rel"; then
+        return 0
+    fi
+
+    if [[ "$INCLUDE_ENV" == true ]] && is_env_path "$rel"; then
+        return 0
+    fi
+
+    if [[ "$INCLUDE_SECRETS" == true ]] && is_secret_path "$rel"; then
+        return 0
+    fi
 
     if is_explicit_include "$rel"; then
         return 0
     fi
 
-    if [[ "$rel" == docs/* ]]; then
-        if [[ "$WITH_DOCS" == true ]] && is_allowed_extension "$rel"; then
-            return 0
-        fi
-        return 1
-    fi
-
-    if [[ "$rel" == src/* || "$rel" == src-tauri/src/* || "$rel" == runtime/* || "$rel" == scripts/* ]]; then
-        if is_allowed_extension "$rel"; then
-            return 0
-        fi
+    if is_allowed_extension "$rel"; then
+        return 0
     fi
 
     return 1
@@ -212,8 +336,24 @@ while [[ $# -gt 0 ]]; do
             WITH_TESTS=true
             shift
             ;;
+        --no-docs)
+            WITH_DOCS=false
+            shift
+            ;;
+        --no-tests)
+            WITH_TESTS=false
+            shift
+            ;;
         --include-lockfiles)
             INCLUDE_LOCKFILES=true
+            shift
+            ;;
+        --include-env)
+            INCLUDE_ENV=true
+            shift
+            ;;
+        --include-secrets)
+            INCLUDE_SECRETS=true
             shift
             ;;
         --no-clipboard)
@@ -256,6 +396,10 @@ if [[ ! "$BUDGET" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+if [[ "$INCLUDE_ENV" == true || "$INCLUDE_SECRETS" == true ]]; then
+    echo "⚠️ Including potentially sensitive files (env/secrets)" >&2
+fi
+
 ensure_tokencount
 
 declare -a all_files
@@ -278,7 +422,7 @@ for rel in "${all_files[@]}"; do
         continue
     fi
 
-    if is_included_by_scope "$rel"; then
+    if is_included_file "$rel"; then
         selected_files+=("$rel")
     fi
 done

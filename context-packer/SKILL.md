@@ -14,7 +14,7 @@ Use this skill when the user wants to:
 
 `prepare-context.sh`:
 1. Selects relevant project files (tracked files by default)
-2. Excludes common junk (generated files, prior dumps, lockfiles unless requested)
+2. Excludes common junk (generated files, prior dumps, lockfiles/env/sensitive files unless requested)
 3. Builds a fenced text dump (`path + ``` + contents`) for all selected files
 4. Writes dump to `<project>/prompt/<output>.txt`
 5. Writes a manifest of included files next to the dump
@@ -30,15 +30,17 @@ $HOME/dev/pi-skills/context-packer/prepare-context.sh <project_dir> [options]
 ## Common invocations
 
 ```bash
-# Default budget (272000), code-focused pack
+# Default budget (272000), code + docs + tests pack
 $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui
 
-# Include docs/
-$HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --with-docs
+# Code-focused pack (exclude docs and tests)
+$HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --no-docs --no-tests
+
+# Include env/sensitive files explicitly (off by default for safety)
+$HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --include-env --include-secrets
 
 # Custom budget and output name
 $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui \
-    --with-docs \
     --budget 272000 \
     --output pui-gpt5.txt
 
@@ -50,9 +52,13 @@ $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --fail-over-budg
 
 - `--output <name>` output filename under `<project>/prompt/` (default: `context-dump.txt`)
 - `--budget <tokens>` token budget (default: `272000`)
-- `--with-docs` include `docs/`
-- `--with-tests` include test files (`__tests__`, `*.test.*`, `*.spec.*`)
+- `--with-docs` include `docs/` (default: on)
+- `--with-tests` include test files (`__tests__`, `tests/`, `test/`, `*.test.*`, `*.spec.*`, etc.) (default: on)
+- `--no-docs` exclude `docs/`
+- `--no-tests` exclude test files (`__tests__`, `tests/`, `test/`, `*.test.*`, `*.spec.*`, etc.)
 - `--include-lockfiles` include lockfiles (`pnpm-lock.yaml`, `Cargo.lock`, etc.)
+- `--include-env` include env files (`.env`, `.env.*`, `.envrc`) (default: off)
+- `--include-secrets` include potentially sensitive files (`.npmrc`, `.netrc`, keys/certs, cloud credential files, etc.) (default: off)
 - `--no-clipboard` do not refresh clipboard from output file
 - `--fail-over-budget` return non-zero if budget exceeded
 - `--install-tools` install missing `tokencount` via cargo
