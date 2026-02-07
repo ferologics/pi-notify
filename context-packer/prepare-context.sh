@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_DIR="$(pwd)"
 OUTPUT_NAME="context-dump.txt"
 BUDGET=272000
+TMP_OUTPUT=false
 WITH_DOCS=true
 WITH_TESTS=true
 INCLUDE_LOCKFILES=false
@@ -21,7 +22,8 @@ Usage:
     prepare-context.sh [project_dir] [options]
 
 Options:
-    --output <name>           Output filename inside <project_dir>/prompt (default: context-dump.txt)
+    --output <name>           Output filename (default: context-dump.txt)
+    --tmp-output              Write output into /tmp/context-packer/... instead of <project_dir>/prompt
     --budget <tokens>         Token budget threshold (default: 272000)
     --with-docs               Include docs/ directory (default: on)
     --with-tests              Include test files (__tests__, tests/, test/, *.test.*, *.spec.*, etc.) (default: on)
@@ -324,6 +326,10 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_NAME="$2"
             shift 2
             ;;
+        --tmp-output)
+            TMP_OUTPUT=true
+            shift
+            ;;
         --budget)
             BUDGET="$2"
             shift 2
@@ -438,11 +444,18 @@ while IFS= read -r rel; do
 done < <(printf '%s\n' "${selected_files[@]}" | LC_ALL=C sort -u)
 selected_files=("${unique_selected_files[@]}")
 
-PROMPT_DIR="$PROJECT_DIR/prompt"
-mkdir -p "$PROMPT_DIR"
+if [[ "$TMP_OUTPUT" == true ]]; then
+    project_slug="$(basename "$PROJECT_DIR" | tr ' ' '-' | tr -cd '[:alnum:]._-')"
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    OUTPUT_DIR="/tmp/context-packer/${project_slug}-${timestamp}"
+else
+    OUTPUT_DIR="$PROJECT_DIR/prompt"
+fi
 
-OUTPUT_PATH="$PROMPT_DIR/$OUTPUT_NAME"
-MANIFEST_PATH="$PROMPT_DIR/${OUTPUT_NAME%.txt}.files.txt"
+mkdir -p "$OUTPUT_DIR"
+
+OUTPUT_PATH="$OUTPUT_DIR/$OUTPUT_NAME"
+MANIFEST_PATH="$OUTPUT_DIR/${OUTPUT_NAME%.txt}.files.txt"
 
 render_dump_file "$OUTPUT_PATH"
 printf '%s\n' "${selected_files[@]}" > "$MANIFEST_PATH"
@@ -460,6 +473,7 @@ fi
 echo ""
 echo "✅ Context dump ready"
 echo "📁 Project:   $PROJECT_DIR"
+echo "📂 Out dir:   $OUTPUT_DIR"
 echo "📄 Output:    $OUTPUT_PATH"
 echo "🧾 Manifest:  $MANIFEST_PATH"
 echo "📦 Files:     ${#selected_files[@]}"

@@ -16,7 +16,7 @@ Use this skill when the user wants to:
 1. Selects relevant project files (tracked files by default)
 2. Excludes common junk (generated files, prior dumps, lockfiles/env/sensitive files unless requested)
 3. Builds a fenced text dump (`path + ``` + contents`) for all selected files
-4. Writes dump to `<project>/prompt/<output>.txt`
+4. Writes dump to `<project>/prompt/<output>.txt` (or `/tmp/context-packer/...` with `--tmp-output`)
 5. Writes a manifest of included files next to the dump
 6. Counts tokens with `tokencount --encoding o200k-base`
 7. Reports whether it fits the provided budget
@@ -50,7 +50,8 @@ $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --fail-over-budg
 
 ## Options
 
-- `--output <name>` output filename under `<project>/prompt/` (default: `context-dump.txt`)
+- `--output <name>` output filename (default: `context-dump.txt`)
+- `--tmp-output` write output to `/tmp/context-packer/...` instead of `<project>/prompt/`
 - `--budget <tokens>` token budget (default: `272000`)
 - `--with-docs` include `docs/` (default: on)
 - `--with-tests` include test files (`__tests__`, `tests/`, `test/`, `*.test.*`, `*.spec.*`, etc.) (default: on)
@@ -66,6 +67,7 @@ $HOME/dev/pi-skills/context-packer/prepare-context.sh ~/dev/pui --fail-over-budg
 ## Requirements
 
 - `tokencount` installed (`cargo install tokencount`)
+- Optional helper utility: [`copy_files`](https://github.com/tulushev/copy_files) (not required)
 - Optional clipboard tools:
   - macOS: `pbcopy`
   - Linux Wayland: `wl-copy`

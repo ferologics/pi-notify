@@ -17,6 +17,7 @@
       "image-compress",
       "markdown-converter",
       "multi-review",
+      "pr-context-packer",
       "session-analyzer",
       "video-compress",
       "youtube-transcript"
