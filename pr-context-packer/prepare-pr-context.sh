@@ -321,6 +321,37 @@ should_include_related_file() {
     return 1
 }
 
+reason_for_omitted_changed_file() {
+    local rel="$1"
+
+    if [[ "$INCLUDE_LOCKFILES" != true ]] && is_lockfile "$rel"; then
+        echo "lockfile"
+        return 0
+    fi
+
+    if [[ "$INCLUDE_ENV" != true ]] && is_env_path "$rel"; then
+        echo "env"
+        return 0
+    fi
+
+    if [[ "$INCLUDE_SECRETS" != true ]] && is_secret_path "$rel"; then
+        echo "secret"
+        return 0
+    fi
+
+    if is_hard_excluded_path "$rel"; then
+        echo "generated/cache"
+        return 0
+    fi
+
+    if ! is_probably_text_file "$rel"; then
+        echo "binary/non-text"
+        return 0
+    fi
+
+    echo "filtered"
+}
+
 ensure_tokencount() {
     if command_exists tokencount; then
         return 0
@@ -431,15 +462,15 @@ write_pr_description_section() {
         return 1
     fi
 
-    local pr_json
+    local -a gh_args
+    gh_args=(pr view --json number,title,body,url,baseRefName,headRefName,state,author)
     if [[ -n "$PR_REF" ]]; then
-        if ! pr_json="$(cd "$REPO_ROOT" && gh pr view "$PR_REF" --json number,title,body,url,baseRefName,headRefName,state,author 2>/dev/null)"; then
-            return 1
-        fi
-    else
-        if ! pr_json="$(cd "$REPO_ROOT" && gh pr view --json number,title,body,url,baseRefName,headRefName,state,author 2>/dev/null)"; then
-            return 1
-        fi
+        gh_args=(pr view "$PR_REF" --json number,title,body,url,baseRefName,headRefName,state,author)
+    fi
+
+    local pr_json
+    if ! pr_json="$(cd "$REPO_ROOT" && gh "${gh_args[@]}" 2>/dev/null)"; then
+        return 1
     fi
 
     PR_JSON="$pr_json" python3 - <<'PY' > "$output_path"
@@ -665,25 +696,14 @@ while IFS= read -r rel; do
 
     src="$REPO_ROOT/$rel"
     if [[ ! -f "$src" ]]; then
-        printf '%s\t%s\n' "$rel" "missing (deleted or unavailable)" >> "$OMITTED_LIST"
+        printf '%s\t%s\n' "$rel" "missing" >> "$OMITTED_LIST"
         continue
     fi
 
     if should_include_changed_file "$rel"; then
         printf '%s\n' "$rel" >> "$CHANGED_LIST"
     else
-        reason="excluded by filters"
-        if [[ "$INCLUDE_LOCKFILES" != true ]] && is_lockfile "$rel"; then
-            reason="lockfile excluded (use --include-lockfiles)"
-        elif [[ "$INCLUDE_ENV" != true ]] && is_env_path "$rel"; then
-            reason="env file excluded (use --include-env)"
-        elif [[ "$INCLUDE_SECRETS" != true ]] && is_secret_path "$rel"; then
-            reason="secret-like file excluded (use --include-secrets)"
-        elif is_hard_excluded_path "$rel"; then
-            reason="generated/cache/binary path excluded"
-        elif ! is_probably_text_file "$rel"; then
-            reason="non-text/binary file excluded"
-        fi
+        reason="$(reason_for_omitted_changed_file "$rel")"
         printf '%s\t%s\n' "$rel" "$reason" >> "$OMITTED_LIST"
     fi
 done < "$CHANGED_RAW"
@@ -732,15 +752,11 @@ if [[ "$WITH_SCRIBE" == true && "$MAX_RELATED" -gt 0 ]]; then
         while IFS= read -r abs_path; do
             [[ -z "$abs_path" ]] && continue
 
-            case "$abs_path" in
-                "$REPO_ROOT"/*)
-                    rel_path="${abs_path#$REPO_ROOT/}"
-                    ;;
-                *)
-                    continue
-                    ;;
-            esac
+            if [[ "$abs_path" != "$REPO_ROOT"/* ]]; then
+                continue
+            fi
 
+            rel_path="${abs_path#$REPO_ROOT/}"
             [[ "$rel_path" == "$target" ]] && continue
             [[ ! -f "$REPO_ROOT/$rel_path" ]] && continue
 
@@ -874,7 +890,11 @@ render_file_blocks "$RELATED_LIST" "$OUTPUT_PATH"
     else
         while IFS=$'\t' read -r rel reason; do
             [[ -z "$rel" ]] && continue
-            echo "- $rel — $reason"
+            if [[ -n "$reason" ]]; then
+                echo "- $rel — $reason"
+            else
+                echo "- $rel"
+            fi
         done < "$OMITTED_LIST"
     fi
 
