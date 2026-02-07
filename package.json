@@ -15,6 +15,6 @@
     },
     "pi": {
         "extensions": ["index.ts"],
-        "video": "https://github.com/ferologics/pi-notify/raw/refs/heads/main/demo.mp4"
+        "video": "https://raw.githubusercontent.com/ferologics/pi-notify/master/demo.mp4"
     }
 }
