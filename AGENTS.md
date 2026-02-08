@@ -27,6 +27,10 @@ extension-name/
 └── README.md     # Usage docs
 ```
 
+Current extensions:
+- `deep-review`
+- `plan-mode`
+
 ## Type Checking
 
 Extensions import from pi's packages. The `tsconfig.json` maps these:

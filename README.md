@@ -6,6 +6,7 @@ Custom extensions for [pi-coding-agent](https://github.com/badlogic/pi-mono).
 
 | Extension | Description |
 | --- | --- |
+| [`deep-review`](deep-review/) | Run context-pack + direct OpenAI Responses deep review with live streaming UI |
 | [`plan-mode`](plan-mode/) | Read-only plan mode with progress tracking and questionnaire support |
 
 Each extension folder contains full usage details and examples.
@@ -15,5 +16,6 @@ Each extension folder contains full usage details and examples.
 Symlink extensions to `~/.pi/agent/extensions/`:
 
 ```bash
-ln -s ~/.pi/repos/pi-extensions/plan-mode ~/.pi/agent/extensions/
+ln -s ~/dev/pi-extensions/deep-review ~/.pi/agent/extensions/
+ln -s ~/dev/pi-extensions/plan-mode ~/.pi/agent/extensions/
 ```
