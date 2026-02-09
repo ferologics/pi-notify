@@ -5,6 +5,7 @@
  * Supports multiple terminal protocols:
  * - OSC 777: Ghostty, iTerm2, WezTerm, rxvt-unicode
  * - OSC 99: Kitty
+ * - tmux passthrough wrapper for OSC notifications
  * - Windows toast: Windows Terminal (WSL)
  * - Optional sound hook via PI_NOTIFY_SOUND_CMD
  */
@@ -24,14 +25,25 @@ function windowsToastScript(title: string, body: string): string {
     ].join("; ");
 }
 
+function wrapForTmux(sequence: string): string {
+    if (!process.env.TMUX) return sequence;
+
+    // tmux passthrough: wrap in DCS and escape inner ESC bytes.
+    const escaped = sequence.split("\x1b").join("\x1b\x1b");
+    return `\x1bPtmux;${escaped}\x1b\\`;
+}
+
 function notifyOSC777(title: string, body: string): void {
-    process.stdout.write(`\x1b]777;notify;${title};${body}\x07`);
+    const sequence = `\x1b]777;notify;${title};${body}\x07`;
+    process.stdout.write(wrapForTmux(sequence));
 }
 
 function notifyOSC99(title: string, body: string): void {
     // Kitty OSC 99: i=notification id, d=0 means not done yet, p=body for second part
-    process.stdout.write(`\x1b]99;i=1:d=0;${title}\x1b\\`);
-    process.stdout.write(`\x1b]99;i=1:p=body;${body}\x1b\\`);
+    const titleSequence = `\x1b]99;i=1:d=0;${title}\x1b\\`;
+    const bodySequence = `\x1b]99;i=1:p=body;${body}\x1b\\`;
+    process.stdout.write(wrapForTmux(titleSequence));
+    process.stdout.write(wrapForTmux(bodySequence));
 }
 
 function notifyWindows(title: string, body: string): void {

@@ -6,16 +6,23 @@ A [Pi](https://github.com/badlogic/pi-mono) extension that sends a native deskto
 
 ## Compatibility
 
-| Terminal         | Support | Protocol         |
-| ---------------- | ------- | ---------------- |
-| Ghostty          | ✓       | OSC 777          |
-| iTerm2           | ✓       | OSC 777          |
-| WezTerm          | ✓       | OSC 777          |
-| rxvt-unicode     | ✓       | OSC 777          |
-| Kitty            | ✓       | OSC 99           |
-| Windows Terminal | ✓       | PowerShell toast |
-| Terminal.app     | ✗       | —                |
-| Alacritty        | ✗       | —                |
+| Terminal                       | Support | Protocol                      |
+| ------------------------------ | ------- | ----------------------------- |
+| Ghostty                        | ✓       | OSC 777                       |
+| iTerm2                         | ✓       | OSC 777                       |
+| WezTerm                        | ✓       | OSC 777                       |
+| rxvt-unicode                   | ✓       | OSC 777                       |
+| Kitty                          | ✓       | OSC 99                        |
+| tmux (inside a supported term) | ✓*      | tmux passthrough + OSC 777/99 |
+| Windows Terminal               | ✓       | PowerShell toast              |
+| Terminal.app                   | ✗       | —                             |
+| Alacritty                      | ✗       | —                             |
+
+\* tmux requires passthrough enabled in your tmux config:
+
+```tmux
+set -g allow-passthrough on
+```
 
 ## Install
 
@@ -37,6 +44,7 @@ When Pi's agent finishes (`agent_end` event), the extension sends a notification
 
 - **OSC 777** (Ghostty, iTerm2, WezTerm, rxvt-unicode): Native escape sequence
 - **OSC 99** (Kitty): Kitty's notification protocol, detected via `KITTY_WINDOW_ID`
+- **tmux passthrough**: OSC sequences are wrapped automatically when `TMUX` is set
 - **Windows toast** (Windows Terminal): PowerShell notification, detected via `WT_SESSION`
 
 Clicking the notification focuses the terminal window/tab.
@@ -77,7 +85,8 @@ OSC = Operating System Command, part of ANSI escape sequences. Terminals use the
 
 ## Known Limitations
 
-Terminal multiplexers (zellij, tmux, screen) create their own PTY and typically don't pass through OSC notification sequences. Run pi directly in your terminal for notifications to work.
+- **tmux** works only with passthrough enabled (`set -g allow-passthrough on`).
+- **zellij/screen** are still unsupported for OSC notifications.
 
 ## License
 
