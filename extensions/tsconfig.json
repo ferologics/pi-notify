@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mariozechner/pi-coding-agent": ["/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent"],
+      "@mariozechner/*": ["/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/*"],
+      "@sinclair/typebox": ["/opt/homebrew/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@sinclair/typebox"]
+    }
+  },
+  "include": ["**/*.ts"]
+}
