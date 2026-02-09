@@ -40,7 +40,6 @@ type ParseResult =
 type ActiveRun = {
     controller: AbortController;
     child?: ChildProcess;
-    cancelResponseStream?: () => void;
 };
 
 type ContextPackResult = {
@@ -63,6 +62,7 @@ type ResponsesResult = {
     };
     durationMs: number;
     debugEvents: string[];
+    debugPayload?: string;
 };
 
 type ClipboardResult = {
@@ -102,7 +102,7 @@ A query is required, either as positional text or via \`--query\`.
 
 ## Options
 
-- \`--query <text>\`         Review request text (alternative to positional query)
+- \`--query <text>\`         Review request text (alternative to positional query; cannot combine both)
 - \`--project <path>\`       Project dir for context packing (default: current cwd)
 - \`--base <ref>\`           Base ref for context pack diff (default: context-packer auto-detect)
 - \`--model <id>\`           Responses model (default: \`gpt-5.2\`)
@@ -121,7 +121,7 @@ A query is required, either as positional text or via \`--query\`.
 `;
 
 const ANSI_REGEX = new RegExp(String.raw`\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)`, "g");
-const WIDGET_TICK_MS = 100;
+const WIDGET_TICK_MS = 250;
 const SPINNER_FRAME_MS = 100;
 const MARKDOWN_THEME = getMarkdownTheme();
 
@@ -306,7 +306,7 @@ function quoteForPrompt(value: string): string {
     return JSON.stringify(value);
 }
 
-function splitArgs(input: string): string[] {
+export function splitArgs(input: string, platform = process.platform): string[] {
     const tokens: string[] = [];
     let current = "";
     let quote: '"' | "'" | null = null;
@@ -320,7 +320,13 @@ function splitArgs(input: string): string[] {
         }
 
         if (char === "\\") {
-            escaping = true;
+            const shouldEscape = platform !== "win32" || quote !== null;
+            if (shouldEscape) {
+                escaping = true;
+                continue;
+            }
+
+            current += char;
             continue;
         }
 
@@ -368,7 +374,7 @@ function normalizeSummary(value: string): ReasoningSummary | undefined {
     return undefined;
 }
 
-function parseOptions(rawArgs: string, cwd: string): ParseResult {
+export function parseOptions(rawArgs: string, cwd: string): ParseResult {
     const tokens = splitArgs(rawArgs);
 
     const options: DeepReviewOptions = {
@@ -491,6 +497,13 @@ function parseOptions(rawArgs: string, cwd: string): ParseResult {
     }
 
     if (positional.length > 0) {
+        if (options.query) {
+            return {
+                ok: false,
+                message: "Query provided both positionally and via --query; choose one.",
+            };
+        }
+
         options.query = positional.join(" ").trim();
     }
 
@@ -507,21 +520,62 @@ function parseOptions(rawArgs: string, cwd: string): ParseResult {
     return { ok: true, options };
 }
 
-async function resolveContextPackerSkillPath(): Promise<string> {
-    const envOverride = process.env.DEEP_REVIEW_CONTEXT_PACKER_SKILL?.trim();
-    const skillPath =
-        envOverride && envOverride.length > 0
-            ? envOverride
-            : path.join(os.homedir(), "dev", "pi-skills", "pr-context-packer", "SKILL.md");
-
-    try {
-        await access(skillPath);
-        return skillPath;
-    } catch {
-        throw new Error(
-            `pr-context-packer skill not found at ${skillPath}. Set DEEP_REVIEW_CONTEXT_PACKER_SKILL to override.`,
-        );
+function expandTildePath(value: string): string {
+    if (!value.startsWith("~")) {
+        return value;
     }
+
+    if (value === "~") {
+        return os.homedir();
+    }
+
+    if (value.startsWith("~/")) {
+        return path.join(os.homedir(), value.slice(2));
+    }
+
+    return value;
+}
+
+async function pathExists(value: string): Promise<boolean> {
+    try {
+        await access(value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function resolveContextPackerSkillPath(projectDir: string): Promise<string> {
+    const envOverride = process.env.DEEP_REVIEW_CONTEXT_PACKER_SKILL?.trim();
+    const candidates = [
+        envOverride ? expandTildePath(envOverride) : undefined,
+        path.join(projectDir, ".pi", "skills", "pr-context-packer", "SKILL.md"),
+        path.join(projectDir, "pr-context-packer", "SKILL.md"),
+        path.join(os.homedir(), "dev", "pi-skills", "pr-context-packer", "SKILL.md"),
+        path.join(os.homedir(), ".pi", "skills", "pr-context-packer", "SKILL.md"),
+        path.join(
+            os.homedir(),
+            ".pi",
+            "agent",
+            "git",
+            "github.com",
+            "ferologics",
+            "pi-skills",
+            "pr-context-packer",
+            "SKILL.md",
+        ),
+    ].filter((candidate): candidate is string => !!candidate);
+
+    for (const candidate of candidates) {
+        if (await pathExists(candidate)) {
+            return candidate;
+        }
+    }
+
+    const expected = candidates.map((candidate) => `- ${candidate}`).join("\n");
+    throw new Error(
+        `pr-context-packer skill not found. Checked:\n${expected}\nSet DEEP_REVIEW_CONTEXT_PACKER_SKILL=/absolute/path/to/SKILL.md to override.`,
+    );
 }
 
 function buildContextPackSkillPrompt(options: DeepReviewOptions): string {
@@ -541,11 +595,27 @@ function buildContextPackSkillPrompt(options: DeepReviewOptions): string {
     ].join("\n");
 }
 
-function extractContextPackPath(output: string): string | undefined {
-    const cleaned = stripAnsi(output);
+function isLikelyContextPackPath(value: string): boolean {
+    return value.endsWith(".txt") && (value.includes("pr-context") || value.includes("context-packer"));
+}
 
-    // Prefer explicit script output line when available, for example:
-    // "📄 Output:           /tmp/context-packer/.../pr-context.txt"
+function rankContextPackCandidate(value: string): number {
+    if (value.endsWith("/pr-context.txt") || value.endsWith("\\pr-context.txt")) {
+        return 0;
+    }
+    if (value.includes("/tmp/context-packer/") || value.toLowerCase().includes("\\temp\\context-packer\\")) {
+        return 1;
+    }
+    if (value.includes("pr-context")) {
+        return 2;
+    }
+    return 3;
+}
+
+export async function extractContextPackPath(output: string): Promise<string | undefined> {
+    const cleaned = stripAnsi(output);
+    const candidates: string[] = [];
+
     const explicitOutputLine = cleaned
         .split(/\r?\n/)
         .map((line) => line.trim())
@@ -558,28 +628,32 @@ function extractContextPackPath(output: string): string | undefined {
             .replace(/^['"]|['"]$/g, "")
             .replace(/[),.:;]+$/g, "");
 
-        if (explicitPath.startsWith("/") && explicitPath.endsWith(".txt")) {
-            return explicitPath;
+        if (isLikelyContextPackPath(explicitPath)) {
+            candidates.push(explicitPath);
         }
     }
 
-    const rawMatches = cleaned.match(/\/[\w./-]+\.txt/g) ?? [];
+    const posixMatches = cleaned.match(/\/[\w./-]+\.txt/g) ?? [];
+    const winMatches = cleaned.match(/[A-Za-z]:\\[^\s"'<>|?*]+\.txt/g) ?? [];
 
-    const candidates = rawMatches
-        .map((match) => match.replace(/[),.:;]+$/g, ""))
-        .filter((match) => match.includes("pr-context") || match.includes("context-packer"));
-
-    if (candidates.length === 0) {
-        return undefined;
+    for (const match of [...posixMatches, ...winMatches]) {
+        const candidate = match.replace(/[),.:;]+$/g, "");
+        if (isLikelyContextPackPath(candidate)) {
+            candidates.push(candidate);
+        }
     }
 
-    const preferred =
-        candidates.find((candidate) => candidate.endsWith("/pr-context.txt")) ??
-        candidates.find((candidate) => candidate.includes("/tmp/context-packer/")) ??
-        candidates.find((candidate) => candidate.includes("pr-context")) ??
-        candidates[candidates.length - 1];
+    const uniqueSortedCandidates = [...new Set(candidates)].sort(
+        (left, right) => rankContextPackCandidate(left) - rankContextPackCandidate(right),
+    );
 
-    return preferred;
+    for (const candidate of uniqueSortedCandidates) {
+        if (await pathExists(candidate)) {
+            return candidate;
+        }
+    }
+
+    return undefined;
 }
 
 function renderLiveWidget(ctx: ExtensionCommandContext, state: LiveState, force = false): void {
@@ -730,7 +804,26 @@ type SseEvent = {
     [key: string]: unknown;
 };
 
-async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEvent, void, void> {
+function findSseBoundary(buffer: string): { index: number; length: number } | null {
+    const rnIndex = buffer.indexOf("\r\n\r\n");
+    const nIndex = buffer.indexOf("\n\n");
+
+    if (rnIndex === -1 && nIndex === -1) {
+        return null;
+    }
+
+    if (rnIndex === -1) {
+        return { index: nIndex, length: 2 };
+    }
+
+    if (nIndex === -1) {
+        return { index: rnIndex, length: 4 };
+    }
+
+    return rnIndex < nIndex ? { index: rnIndex, length: 4 } : { index: nIndex, length: 2 };
+}
+
+export async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEvent, void, void> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -744,15 +837,13 @@ async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator
         buffer += decoder.decode(value, { stream: true });
 
         while (true) {
-            const separatorMatch = buffer.match(/\r?\n\r?\n/);
-            const boundary = separatorMatch?.index ?? -1;
-
-            if (boundary === -1 || !separatorMatch) {
+            const boundary = findSseBoundary(buffer);
+            if (!boundary) {
                 break;
             }
 
-            const rawEvent = buffer.slice(0, boundary);
-            buffer = buffer.slice(boundary + separatorMatch[0].length);
+            const rawEvent = buffer.slice(0, boundary.index);
+            buffer = buffer.slice(boundary.index + boundary.length);
 
             const lines = rawEvent.split(/\r?\n/);
             const dataLines: string[] = [];
@@ -791,9 +882,15 @@ async function resolveBearerToken(
         return { token: fromEnv, source: "OPENAI_API_KEY" };
     }
 
-    const openAiModel = getModel("openai", modelId as never) as Model<any> | undefined;
-    if (openAiModel) {
-        const fromAuth = await ctx.modelRegistry.getApiKey(openAiModel);
+    const modelCandidates = [
+        getModel("openai", modelId as never),
+        getModel("openai-codex", modelId as never),
+        getModel("openai", "gpt-5" as never),
+        getModel("openai", "gpt-4.1" as never),
+    ].filter(Boolean);
+
+    for (const candidate of modelCandidates) {
+        const fromAuth = await ctx.modelRegistry.getApiKey(candidate as unknown as Model<any>);
         if (fromAuth) {
             return { token: fromAuth, source: "auth.json/openai" };
         }
@@ -837,7 +934,6 @@ async function streamResponses(
     onThinkingDelta: (delta: string) => void,
     onAnswerDelta: (delta: string) => void,
     onEvent: (eventType: string) => void,
-    onStreamReady?: (cancel: () => void) => void,
 ): Promise<ResponsesResult> {
     const startedAt = Date.now();
     const { token, source } = await resolveBearerToken(ctx, options.model);
@@ -897,88 +993,54 @@ async function streamResponses(
         throw new Error(`Responses API failed (${response.status}): ${body}`);
     }
 
-    const cancelStream = () => {
-        const body = response.body;
-        if (!body) {
-            return;
-        }
-
-        // Once parseSseStream() has acquired a reader, the ReadableStream is locked.
-        // Calling body.cancel() in that state throws ERR_INVALID_STATE synchronously.
-        if (body.locked) {
-            return;
-        }
-
-        try {
-            void body.cancel().catch(() => {
-                // ignore async cancellation errors
-            });
-        } catch {
-            // ignore sync cancellation errors
-        }
-    };
-
-    onStreamReady?.(cancelStream);
-
     if (signal.aborted) {
-        cancelStream();
         throw new Error("Request was aborted");
     }
-
-    const onAbort = () => {
-        cancelStream();
-    };
-
-    signal.addEventListener("abort", onAbort, { once: true });
 
     const debugEvents: string[] = [];
     let thinking = "";
     let answer = "";
     let completedResponse: any;
 
-    try {
-        for await (const event of parseSseStream(response.body)) {
-            if (signal.aborted) {
-                throw new Error("Request was aborted");
-            }
-
-            if (options.debug) {
-                debugEvents.push(JSON.stringify(event));
-            }
-
-            const eventType = typeof event.type === "string" ? event.type : "(unknown)";
-            onEvent(eventType);
-
-            if (event.type === "response.reasoning_summary_text.delta") {
-                const delta = typeof event.delta === "string" ? event.delta : "";
-                if (delta) {
-                    thinking += delta;
-                    onThinkingDelta(delta);
-                }
-                continue;
-            }
-
-            if (event.type === "response.output_text.delta") {
-                const delta = typeof event.delta === "string" ? event.delta : "";
-                if (delta) {
-                    answer += delta;
-                    onAnswerDelta(delta);
-                }
-                continue;
-            }
-
-            if (event.type === "response.completed") {
-                completedResponse = event.response;
-                continue;
-            }
-
-            if (event.type === "error") {
-                const message = typeof event.message === "string" ? event.message : JSON.stringify(event);
-                throw new Error(`Responses stream error: ${message}`);
-            }
+    for await (const event of parseSseStream(response.body)) {
+        if (signal.aborted) {
+            throw new Error("Request was aborted");
         }
-    } finally {
-        signal.removeEventListener("abort", onAbort);
+
+        if (options.debug) {
+            debugEvents.push(JSON.stringify(event));
+        }
+
+        const eventType = typeof event.type === "string" ? event.type : "(unknown)";
+        onEvent(eventType);
+
+        if (event.type === "response.reasoning_summary_text.delta") {
+            const delta = typeof event.delta === "string" ? event.delta : "";
+            if (delta) {
+                thinking += delta;
+                onThinkingDelta(delta);
+            }
+            continue;
+        }
+
+        if (event.type === "response.output_text.delta") {
+            const delta = typeof event.delta === "string" ? event.delta : "";
+            if (delta) {
+                answer += delta;
+                onAnswerDelta(delta);
+            }
+            continue;
+        }
+
+        if (event.type === "response.completed") {
+            completedResponse = event.response;
+            continue;
+        }
+
+        if (event.type === "error") {
+            const message = typeof event.message === "string" ? event.message : JSON.stringify(event);
+            throw new Error(`Responses stream error: ${message}`);
+        }
     }
 
     if (!answer.trim() && completedResponse) {
@@ -1018,14 +1080,25 @@ async function streamResponses(
 
     const responseId = typeof completedResponse?.id === "string" ? completedResponse.id : undefined;
 
+    let debugPayload: string | undefined;
+
     if (options.debug) {
+        debugPayload = JSON.stringify(payload, null, 4);
+
         debugEvents.unshift(
             JSON.stringify({
                 type: "request_meta",
                 tokenSource: source,
                 hasOrganizationHeader: !!organization,
                 hasProjectHeader: !!projectId,
-                payload,
+                payloadMeta: {
+                    model: options.model,
+                    effort: options.effort,
+                    summary: options.summary,
+                    verbosity: options.verbosity,
+                    contextChars: contextText.length,
+                    queryChars: options.query.length,
+                },
             }),
         );
     }
@@ -1043,6 +1116,7 @@ async function streamResponses(
         },
         durationMs: Date.now() - startedAt,
         debugEvents,
+        debugPayload,
     };
 }
 
@@ -1075,7 +1149,7 @@ function summarizeContextPackMessage(packResult: ContextPackResult, packPath: st
     return lines.join("\n");
 }
 
-function normalizeSectionLikeBoldMarkdown(markdown: string): string {
+export function normalizeSectionLikeBoldMarkdown(markdown: string): string {
     if (!markdown.trim()) {
         return markdown;
     }
@@ -1234,10 +1308,6 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
             if (activeRun.child) {
                 activeRun.child.kill("SIGTERM");
             }
-
-            if (activeRun.cancelResponseStream) {
-                activeRun.cancelResponseStream();
-            }
         },
     });
 
@@ -1270,7 +1340,7 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
 
             let skillPath: string;
             try {
-                skillPath = await resolveContextPackerSkillPath();
+                skillPath = await resolveContextPackerSkillPath(options.projectDir);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 pi.sendMessage({ customType: "deep-review-error", content: message, display: true });
@@ -1304,9 +1374,11 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
                     renderLiveWidget(ctx, live, true);
                 }
 
-                const renderTicker = setInterval(() => {
-                    renderLiveWidget(ctx, live, true);
-                }, WIDGET_TICK_MS);
+                const renderTicker = ctx.hasUI
+                    ? setInterval(() => {
+                          renderLiveWidget(ctx, live, true);
+                      }, WIDGET_TICK_MS)
+                    : undefined;
 
                 let debugDir: string | undefined;
 
@@ -1315,18 +1387,23 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
 
                     const cleanedPackOutput = stripMarkdownFenceLines(stripAnsi(packResult.stdout));
                     const cleanedPackStderr = stripMarkdownFenceLines(stripAnsi(packResult.stderr));
-                    const packPath = extractContextPackPath(`${cleanedPackOutput}\n${cleanedPackStderr}`);
+                    const packPath = await extractContextPackPath(`${cleanedPackOutput}\n${cleanedPackStderr}`);
 
                     if (packResult.exitCode !== 0) {
                         if (active.controller.signal.aborted) {
                             throw new Error("Request was aborted");
                         }
 
-                        const failureDetails = truncate(cleanedPackOutput || cleanedPackStderr, 12000).text.trim();
+                        const stdoutSnippet = truncate(cleanedPackOutput, 8000).text.trim();
+                        const stderrSnippet = truncate(cleanedPackStderr, 8000).text.trim();
                         const contentLines = ["deep-review failed."];
 
-                        if (failureDetails) {
-                            contentLines.push("", "```text", failureDetails, "```");
+                        if (stderrSnippet) {
+                            contentLines.push("", "### stderr", "", "```text", stderrSnippet, "```");
+                        }
+
+                        if (stdoutSnippet) {
+                            contentLines.push("", "### stdout", "", "```text", stdoutSnippet, "```");
                         }
 
                         pi.sendMessage({
@@ -1384,12 +1461,7 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
                             live.lastResponsesEventType = eventType;
                             renderLiveWidget(ctx, live);
                         },
-                        (cancel) => {
-                            active.cancelResponseStream = cancel;
-                        },
                     );
-
-                    active.cancelResponseStream = undefined;
 
                     if (options.debug) {
                         debugDir = await mkdtemp(path.join(os.tmpdir(), "deep-review-"));
@@ -1399,6 +1471,14 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
                             `${responses.debugEvents.join("\n")}\n`,
                             "utf8",
                         );
+
+                        if (responses.debugPayload) {
+                            await writeFile(
+                                path.join(debugDir, "responses-request.json"),
+                                `${responses.debugPayload}\n`,
+                                "utf8",
+                            );
+                        }
                     }
 
                     const totalDurationMs = Date.now() - startedAt;
@@ -1472,9 +1552,9 @@ export default function deepReviewExtension(pi: ExtensionAPI): void {
                         }
                     }
                 } finally {
-                    clearInterval(renderTicker);
-                    active.cancelResponseStream = undefined;
-
+                    if (renderTicker) {
+                        clearInterval(renderTicker);
+                    }
                     if (ctx.hasUI) {
                         ctx.ui.setStatus("deep-review", undefined);
                         ctx.ui.setWidget("deep-review-live", undefined);
