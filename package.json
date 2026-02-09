@@ -1,0 +1,10 @@
+{
+    "name": "pi-shit",
+    "private": true,
+    "version": "0.1.0",
+    "keywords": ["pi-package"],
+    "pi": {
+        "extensions": ["extensions/**/index.ts"],
+        "skills": ["skills"]
+    }
+}
