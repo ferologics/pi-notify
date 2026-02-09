@@ -6,16 +6,16 @@ A [Pi](https://github.com/badlogic/pi-mono) extension that sends a native deskto
 
 ## Compatibility
 
-| Terminal | Support | Protocol |
-|----------|---------|----------|
-| Ghostty | ✓ | OSC 777 |
-| iTerm2 | ✓ | OSC 777 |
-| WezTerm | ✓ | OSC 777 |
-| rxvt-unicode | ✓ | OSC 777 |
-| Kitty | ✓ | OSC 99 |
-| Windows Terminal | ✓ | PowerShell toast |
-| Terminal.app | ✗ | — |
-| Alacritty | ✗ | — |
+| Terminal         | Support | Protocol         |
+| ---------------- | ------- | ---------------- |
+| Ghostty          | ✓       | OSC 777          |
+| iTerm2           | ✓       | OSC 777          |
+| WezTerm          | ✓       | OSC 777          |
+| rxvt-unicode     | ✓       | OSC 777          |
+| Kitty            | ✓       | OSC 99           |
+| Windows Terminal | ✓       | PowerShell toast |
+| Terminal.app     | ✗       | —                |
+| Alacritty        | ✗       | —                |
 
 ## Install
 
