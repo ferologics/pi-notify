@@ -19,7 +19,24 @@ Or from git once remote exists:
 pi install git:github.com/ferologics/pi-shit
 ```
 
-## Notes
+## Sync
 
-- `deep-review` resolves `pr-context-packer` from bundled `skills/pr-context-packer/SKILL.md` first (unless `DEEP_REVIEW_CONTEXT_PACKER_SKILL` is set).
-- Keep this repo as the single source of truth for shipping both extensions and skills together.
+This repo is assembled with git subtrees:
+
+- `skills/` ← `pi-skills`
+- `extensions/` ← `pi-extensions`
+- `extensions/pi-notify` ← `pi-notify`
+
+Update all sources with:
+
+```bash
+just update
+```
+
+Or update individually:
+
+```bash
+just update-skills
+just update-extensions
+just update-notify
+```
