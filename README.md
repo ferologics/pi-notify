@@ -6,17 +6,17 @@ A [Pi](https://github.com/badlogic/pi-mono) extension that sends a native deskto
 
 ## Compatibility
 
-| Terminal                       | Support | Protocol                      |
-| ------------------------------ | ------- | ----------------------------- |
-| Ghostty                        | ✓       | OSC 777                       |
-| iTerm2                         | ✓       | OSC 777                       |
-| WezTerm                        | ✓       | OSC 777                       |
-| rxvt-unicode                   | ✓       | OSC 777                       |
-| Kitty                          | ✓       | OSC 99                        |
-| tmux (inside a supported term) | ✓*      | tmux passthrough + OSC 777/99 |
-| Windows Terminal               | ✓       | PowerShell toast              |
-| Terminal.app                   | ✗       | —                             |
-| Alacritty                      | ✗       | —                             |
+| Terminal                       | Support | Protocol                        |
+| ------------------------------ | ------- | ------------------------------- |
+| Ghostty                        | ✓       | OSC 777                         |
+| iTerm2                         | ✓       | OSC 9                           |
+| WezTerm                        | ✓       | OSC 777                         |
+| rxvt-unicode                   | ✓       | OSC 777                         |
+| Kitty                          | ✓       | OSC 99                          |
+| tmux (inside a supported term) | ✓*      | tmux passthrough + OSC 777/99/9 |
+| Windows Terminal               | ✓       | PowerShell toast                |
+| Terminal.app                   | ✗       | —                               |
+| Alacritty                      | ✗       | —                               |
 
 \* tmux requires passthrough enabled in your tmux config:
 
@@ -42,7 +42,8 @@ Restart Pi.
 
 When Pi's agent finishes (`agent_end` event), the extension sends a notification via the appropriate protocol:
 
-- **OSC 777** (Ghostty, iTerm2, WezTerm, rxvt-unicode): Native escape sequence
+- **OSC 777** (Ghostty, WezTerm, rxvt-unicode): Native escape sequence
+- **OSC 9** (iTerm2): iTerm2 notification protocol, detected via `TERM_PROGRAM=iTerm.app`
 - **OSC 99** (Kitty): Kitty's notification protocol, detected via `KITTY_WINDOW_ID`
 - **tmux passthrough**: OSC sequences are wrapped automatically when `TMUX` is set
 - **Windows toast** (Windows Terminal): PowerShell notification, detected via `WT_SESSION`
@@ -77,11 +78,11 @@ $env:PI_NOTIFY_SOUND_CMD = 'powershell -NoProfile -Command "[console]::beep(880,
 
 The command is run in the background (`shell: true`, detached) so it won't block Pi.
 
-## What's OSC 777/99?
+## What's OSC 777/99/9?
 
 OSC = Operating System Command, part of ANSI escape sequences. Terminals use these for things beyond text formatting (change title, colors, notifications, etc.).
 
-`777` is the number rxvt-unicode picked for notifications. Ghostty, iTerm2, WezTerm adopted it. Kitty uses `99` with a more extensible protocol.
+`777` is the number rxvt-unicode picked for notifications. Ghostty and WezTerm adopted it. iTerm2 uses `9` instead, and Kitty uses `99` with a more extensible protocol.
 
 ## Known Limitations
 
