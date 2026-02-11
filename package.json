@@ -24,5 +24,10 @@
             "index.ts"
         ],
         "video": "https://raw.githubusercontent.com/ferologics/pi-notify/master/demo.mp4"
+    },
+    "piRelease": {
+        "repo": "ferologics/pi-notify",
+        "branch": "master",
+        "subtreePublishRecipe": "publish-pi-notify"
     }
 }
