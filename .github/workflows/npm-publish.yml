@@ -32,7 +32,6 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: "22"
-                  registry-url: "https://registry.npmjs.org"
 
             - name: Read package metadata
               id: pkg
@@ -59,6 +58,8 @@ jobs:
 
             - name: Publish to npm (trusted publisher / OIDC)
               if: steps.npm_exists.outputs.exists != 'true'
+              env:
+                  NODE_AUTH_TOKEN: ""
               run: npm publish --provenance
 
             - name: Skip message (already published)
