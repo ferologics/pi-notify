@@ -5,6 +5,11 @@ on:
         types:
             - published
     workflow_dispatch:
+        inputs:
+            tag:
+                description: "Release tag to publish (for manual reruns)"
+                required: false
+                type: string
 
 jobs:
     publish:
@@ -16,7 +21,13 @@ jobs:
             - name: Resolve tag
               id: release_ref
               run: |
-                  TAG="${{ github.event.release.tag_name || github.ref_name }}"
+                  TAG="${{ github.event.release.tag_name }}"
+                  if [ -z "$TAG" ]; then
+                      TAG="${{ github.event.inputs.tag }}"
+                  fi
+                  if [ -z "$TAG" ]; then
+                      TAG="${{ github.ref_name }}"
+                  fi
                   if [ -z "$TAG" ]; then
                       echo "Could not resolve tag name."
                       exit 1
