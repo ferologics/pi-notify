@@ -1,0 +1,36 @@
+name: Publish package to npm
+
+on:
+    release:
+        types:
+            - published
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - name: Checkout release tag
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.release.tag_name }}
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  registry-url: "https://registry.npmjs.org"
+
+            - name: Verify tag matches package version
+              run: |
+                  TAG="${{ github.event.release.tag_name }}"
+                  VERSION="$(node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); process.stdout.write(pkg.version)")"
+                  if [ "v$VERSION" != "$TAG" ]; then
+                      echo "Tag $TAG does not match package.json version $VERSION"
+                      exit 1
+                  fi
+
+            - name: Publish to npm (trusted publisher / OIDC)
+              run: npm publish --provenance
