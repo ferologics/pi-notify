@@ -42,14 +42,19 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "22"
+                  node-version: "24"
                   registry-url: "https://registry.npmjs.org"
                   token: ""
 
-            - name: Upgrade npm CLI for trusted publishing
+            - name: Verify npm CLI supports trusted publishing
               run: |
-                  npm install -g npm@11
-                  npm --version
+                  VERSION="$(npm --version)"
+                  MAJOR="${VERSION%%.*}"
+                  if [ "$MAJOR" -lt 11 ]; then
+                      echo "npm $VERSION is too old for trusted publishing; need >=11"
+                      exit 1
+                  fi
+                  echo "Using npm $VERSION"
 
             - name: Read package metadata
               id: pkg
