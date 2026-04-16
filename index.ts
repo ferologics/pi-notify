@@ -12,18 +12,62 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import * as path from "node:path";
+import { execSync } from "node:child_process";
 
-function windowsToastScript(title: string, body: string): string {
+function getProjectName(): string {
+    return path.basename(process.cwd());
+}
+
+function isWSL(): boolean {
+    return Boolean(process.env.WSLENV) || process.platform === "linux";
+}
+
+function resolveIconPath(iconRelative: string): string {
+    // Resolve the path relative to this file's directory
+    const localPath = path.resolve(__dirname, iconRelative);
+
+    // If we're in WSL, convert Linux path to Windows path for PowerShell
+    if (isWSL() && localPath.startsWith("/mnt/")) {
+        try {
+            return execSync(`wslpath -w "${localPath}"`, { encoding: "utf8" }).trim();
+        } catch {
+            return localPath;
+        }
+    }
+
+    return localPath;
+}
+
+function windowsToastScript(title: string, body: string, iconPath: string = ""): string {
     const type = "Windows.UI.Notifications";
     const mgr = `[${type}.ToastNotificationManager, ${type}, ContentType = WindowsRuntime]`;
-    const template = `[${type}.ToastTemplateType]::ToastText01`;
-    const toast = `[${type}.ToastNotification]::new($xml)`;
-    return [
-        `${mgr} > $null`,
-        `$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
-        `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode('${body}')) > $null`,
-        `[${type}.ToastNotificationManager]::CreateToastNotifier('${title}').Show(${toast})`,
-    ].join("; ");
+    
+    // ToastImageAndText02: Image, Title, Body | ToastText02: Title, Body
+    const templateType = iconPath ? "ToastImageAndText02" : "ToastText02";
+    const template = `[${type}.ToastTemplateType]::${templateType}`;
+
+    const safeTitle = title.replace(/'/g, "''");
+    const safeBody = body.replace(/'/g, "''");
+
+    const script = [
+        `${mgr} | Out-Null`,
+        `$t = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
+        `$t1 = $t.SelectSingleNode('//text[1]')`,
+        `$t2 = $t.SelectSingleNode('//text[2]')`,
+        `$t1.AppendChild($t.CreateTextNode('${safeTitle}')) | Out-Null`,
+        `$t2.AppendChild($t.CreateTextNode('${safeBody}')) | Out-Null`
+    ];
+
+    if (iconPath) {
+        const safeIconPath = iconPath.replace(/'/g, "''");
+        script.push(`$i = $t.SelectSingleNode('//image')`);
+        script.push(`$i.SetAttribute('src', '${safeIconPath}') | Out-Null`);
+    }
+
+    script.push(`[${type}.ToastNotificationManager]::CreateToastNotifier('Pi Agent').Show([${type}.ToastNotification]::new($t))`);
+
+    return script.join("; ");
 }
 
 function wrapForTmux(sequence: string): string {
@@ -52,9 +96,16 @@ function notifyOSC99(title: string, body: string): void {
     process.stdout.write(wrapForTmux(bodySequence));
 }
 
-function notifyWindows(title: string, body: string): void {
+function notifyWindows(title: string, body: string, iconPath?: string): void {
     const { execFile } = require("node:child_process");
-    execFile("powershell.exe", ["-NoProfile", "-Command", windowsToastScript(title, body)]);
+    const args = ["-NoProfile", "-Command", windowsToastScript(title, body, iconPath)];
+    
+    // Try pwsh first, fallback to powershell.exe
+    execFile("pwsh", args, (err: Error | null) => {
+        if (err) {
+            execFile("powershell.exe", args);
+        }
+    });
 }
 
 function runSoundHook(): void {
@@ -74,11 +125,11 @@ function runSoundHook(): void {
     }
 }
 
-function notify(title: string, body: string): void {
+function notify(title: string, body: string, iconPath?: string): void {
     const isIterm2 = process.env.TERM_PROGRAM === "iTerm.app" || Boolean(process.env.ITERM_SESSION_ID);
 
     if (process.env.WT_SESSION) {
-        notifyWindows(title, body);
+        notifyWindows(title, body, iconPath);
     } else if (process.env.KITTY_WINDOW_ID) {
         notifyOSC99(title, body);
     } else if (isIterm2) {
@@ -92,6 +143,7 @@ function notify(title: string, body: string): void {
 
 export default function (pi: ExtensionAPI) {
     pi.on("agent_end", async () => {
-        notify("Pi", "Ready for input");
+        const iconPath = resolveIconPath("logo.png");
+        notify(`Pi (${getProjectName()})`, "Ready for input", iconPath);
     });
 }
