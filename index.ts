@@ -47,20 +47,21 @@ function windowsToastScript(title: string, body: string, iconPath: string = ""):
     const safeBody = body.replace(/'/g, "''");
 
     const script = [
-        `${mgr} > $null`,
-        `$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
-        `$t = $xml.SelectNodes('//text')`,
-        `$t[0].InnerText = '${safeTitle}'`,
-        `$t[1].InnerText = '${safeBody}'`
+        `${mgr} | Out-Null`,
+        `$t = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
+        `$t1 = $t.SelectSingleNode('//text[1]')`,
+        `$t2 = $t.SelectSingleNode('//text[2]')`,
+        `$t1.AppendChild($t.CreateTextNode('${safeTitle}')) | Out-Null`,
+        `$t2.AppendChild($t.CreateTextNode('${safeBody}')) | Out-Null`
     ];
 
     if (iconPath) {
         const safeIconPath = iconPath.replace(/'/g, "''");
-        script.push(`$imageNodes = $xml.GetElementsByTagName('image')`);
-        script.push(`$imageNodes[0].SetAttribute('src', '${safeIconPath}') > $null`);
+        script.push(`$i = $t.SelectSingleNode('//image')`);
+        script.push(`$i.SetAttribute('src', '${safeIconPath}') | Out-Null`);
     }
 
-    script.push(`[${type}.ToastNotificationManager]::CreateToastNotifier('Pi Agent').Show([${type}.ToastNotification]::new($xml))`);
+    script.push(`[${type}.ToastNotificationManager]::CreateToastNotifier('Pi Agent').Show([${type}.ToastNotification]::new($t))`);
 
     return script.join("; ");
 }
