@@ -15,6 +15,10 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
 
+function getProjectName(): string {
+    return path.basename(process.cwd());
+}
+
 function isWSL(): boolean {
     return Boolean(process.env.WSLENV) || process.platform === "linux";
 }
@@ -139,10 +143,7 @@ function notify(title: string, body: string, iconPath?: string): void {
 
 export default function (pi: ExtensionAPI) {
     pi.on("agent_end", async () => {
-        // Resolve logo.png relative to this extension's location
-        // Windows: C:\path\to\logo.png
-        // WSL: Converted via wslpath -w to C:\path\to\logo.png
         const iconPath = resolveIconPath("logo.png");
-        notify("Pi", "Ready for input", iconPath);
+        notify(`Pi (${getProjectName()})`, "Ready for input", iconPath);
     });
 }
