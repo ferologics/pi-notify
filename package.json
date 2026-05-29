@@ -19,6 +19,12 @@
     "bugs": {
         "url": "https://github.com/ferologics/pi-notify/issues"
     },
+    "scripts": {
+        "test": "bun test"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    },
     "pi": {
         "extensions": [
             "index.ts"
