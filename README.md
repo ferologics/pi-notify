@@ -40,7 +40,7 @@ Restart Pi.
 
 ## How it works
 
-When Pi's agent finishes (`agent_end` event), the extension sends a notification via the appropriate protocol:
+When Pi's agent finishes (`agent_end` event), the extension checks suppression signals and — if notification is warranted — sends a notification via the appropriate protocol:
 
 - **OSC 777** (Ghostty, WezTerm, rxvt-unicode): Native escape sequence
 - **OSC 9** (iTerm2): iTerm2 notification protocol, detected via `TERM_PROGRAM=iTerm.app`
@@ -49,6 +49,22 @@ When Pi's agent finishes (`agent_end` event), the extension sends a notification
 - **Windows toast** (Windows Terminal): PowerShell notification, detected via `WT_SESSION`
 
 Clicking the notification focuses the terminal window/tab.
+
+## Notification content
+
+- **Title:** `Pi — <session name>` when a Pi session name is set, otherwise `Pi Agent`
+- **Body:** `Done: "your last prompt"` (truncated to 60 characters), or `Task complete. Ready for input.` if no prompt text is available
+
+## Smart suppression
+
+The extension suppresses notifications to avoid noise. Checks run cheapest-first:
+
+| Signal | Threshold | Reason |
+| --- | --- | --- |
+| Queued follow-up | any | `agent_end` is not a real stop — another turn is coming |
+| Recent steer | 15 seconds | User sent a mid-stream message — they are present |
+| Cooldown | 30 seconds | Deduplicates rapid back-to-back completions |
+| Focus detection | `PI_NOTIFY_FOCUS_CMD` exit 0 | Terminal is frontmost — user is already watching |
 
 ## Optional: Custom sound hook
 
@@ -61,7 +77,7 @@ This keeps the extension tiny and cross-platform: you choose the command for you
 ### Example (macOS)
 
 ```fish
-set -Ux PI_NOTIFY_SOUND_CMD 'afplay ~/Library/Sounds/Glass.aiff'
+set -Ux PI_NOTIFY_SOUND_CMD 'afplay /System/Library/Sounds/Crystal.aiff'
 ```
 
 ### Example (Linux)
@@ -77,6 +93,25 @@ $env:PI_NOTIFY_SOUND_CMD = 'powershell -NoProfile -Command "[console]::beep(880,
 ```
 
 The command is run in the background (`shell: true`, detached) so it won't block Pi.
+
+## Optional: Focus suppression
+
+Set `PI_NOTIFY_FOCUS_CMD` to a shell command that exits **0 when your terminal is frontmost**. When it exits 0, the notification is suppressed (you're already watching).
+
+### Example (macOS — suppress when iTerm2, Ghostty, kitty, or Terminal is frontmost)
+
+```fish
+set -Ux PI_NOTIFY_FOCUS_CMD \
+  "osascript -e 'tell application \"System Events\" to get name of first application process whose frontmost is true' | grep -qE 'iTerm2|Ghostty|kitty|Terminal'"
+```
+
+### Example (Linux — suppress when a terminal has focus via xdotool)
+
+```bash
+export PI_NOTIFY_FOCUS_CMD='xdotool getactivewindow getwindowname | grep -qiE "terminal|kitty|alacritty"'
+```
+
+If `PI_NOTIFY_FOCUS_CMD` is unset, focus detection is skipped and the cooldown + streaming signals alone gate notifications.
 
 ## What's OSC 777/99/9?
 
