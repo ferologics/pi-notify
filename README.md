@@ -77,7 +77,7 @@ This keeps the extension tiny and cross-platform: you choose the command for you
 ### Example (macOS)
 
 ```fish
-set -Ux PI_NOTIFY_SOUND_CMD 'afplay /System/Library/Sounds/Crystal.aiff'
+set -Ux PI_NOTIFY_SOUND_CMD 'afplay ~/Library/Sounds/Glass.aiff'
 ```
 
 ### Example (Linux)

@@ -46,6 +46,10 @@ test("buildTitle: session name is included in title", () => {
     expect(buildTitle("my-project")).toBe("Pi — my-project");
 });
 
+test("buildTitle: empty string falls back to 'Pi Agent'", () => {
+    expect(buildTitle("")).toBe("Pi Agent");
+});
+
 // --- recordInput ---
 
 test("recordInput: steer updates lastSteerAt", () => {
@@ -110,5 +114,19 @@ test("shouldNotify: focused terminal suppresses", () => {
 test("shouldNotify: all clear returns true", () => {
     const s = createState();
     const result = shouldNotify(s, 1_000_000, () => false);
+    expect(result).toBe(true);
+});
+
+test("shouldNotify: steer exactly ENGAGEMENT_MS ago allows notification", () => {
+    const s = createState();
+    s.lastSteerAt = 1_000_000;
+    const result = shouldNotify(s, 1_000_000 + ENGAGEMENT_MS, () => false);
+    expect(result).toBe(true);
+});
+
+test("shouldNotify: cooldown exactly COOLDOWN_MS ago allows notification", () => {
+    const s = createState();
+    s.lastNotifiedAt = 1_000_000;
+    const result = shouldNotify(s, 1_000_000 + COOLDOWN_MS, () => false);
     expect(result).toBe(true);
 });
