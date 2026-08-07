@@ -90,8 +90,29 @@ function notify(title: string, body: string): void {
     runSoundHook();
 }
 
+// ExtensionAPI.on does not yet declare "agent_settled" in the published
+// types, but Pi emits it at runtime once the agent is fully settled — no
+// automatic retry, compaction retry, or queued follow-up remains (see
+// docs/extensions.md). Augment locally so registration type-checks.
+type NotifyExtensionAPI = ExtensionAPI & {
+    on(event: "agent_settled", handler: () => void | Promise<void>): void;
+};
+
 export default function (pi: ExtensionAPI) {
-    pi.on("agent_end", async () => {
+    const handler = async () => {
         notify("Pi", "Ready for input");
-    });
+    };
+
+    // Notify once the agent is fully settled (no automatic retry, compaction
+    // retry, or queued follow-up remains) — i.e. Pi is truly waiting for
+    // input, so we avoid spurious notifications during retry backoff.
+    //
+    // Set PI_NOTIFY_EVENT=agent_end to restore the legacy per-run behavior
+    // (notify after every low-level run, including runs that will be retried).
+    const api = pi as NotifyExtensionAPI;
+    if (process.env.PI_NOTIFY_EVENT === "agent_end") {
+        api.on("agent_end", handler);
+    } else {
+        api.on("agent_settled", handler);
+    }
 }
