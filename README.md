@@ -38,9 +38,19 @@ pi install git:github.com/ferologics/pi-notify
 
 Restart Pi.
 
+## When the notification fires
+
+The notification fires on the `agent_settled` event — the moment the agent is fully done and waiting for input, with **no automatic retry, compaction retry, or queued follow-up remaining**. This means you get exactly one notification per task, not one per retry attempt.
+
+To restore the legacy per-run behavior (notify after every low-level agent run, including runs that Pi will retry), set:
+
+```bash
+export PI_NOTIFY_EVENT=agent_end
+```
+
 ## How it works
 
-When Pi's agent finishes (`agent_end` event), the extension sends a notification via the appropriate protocol:
+When the notification fires, the extension sends it via the appropriate protocol:
 
 - **OSC 777** (Ghostty, WezTerm, rxvt-unicode): Native escape sequence
 - **OSC 9** (iTerm2): iTerm2 notification protocol, detected via `TERM_PROGRAM=iTerm.app`
@@ -52,7 +62,7 @@ Clicking the notification focuses the terminal window/tab.
 
 ## Optional: Custom sound hook
 
-You can run a custom command whenever a notification is sent by setting `PI_NOTIFY_SOUND_CMD`.
+You can run a custom command whenever a notification is sent by setting `PI_NOTIFY_SOUND_CMD` (this is a sound hook only — to control *when* notifications fire, use `PI_NOTIFY_EVENT` above).
 
 This keeps the extension tiny and cross-platform: you choose the command for your OS.
 
