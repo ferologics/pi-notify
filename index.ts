@@ -26,6 +26,19 @@ function windowsToastScript(title: string, body: string): string {
     ].join("; ");
 }
 
+function getTmuxWindow(): string | undefined {
+    if (!process.env.TMUX || !process.env.TMUX_PANE) return undefined;
+    try {
+        const { execFileSync } = require("node:child_process");
+        return execFileSync("tmux", [
+            "display-message", "-p", "-t", process.env.TMUX_PANE,
+            "[#I][#{window_name}]"
+        ], { encoding: "utf8", timeout: 1000 }).trim();
+    } catch {
+        return undefined;
+    }
+}
+
 function wrapForTmux(sequence: string): string {
     if (!process.env.TMUX) return sequence;
 
@@ -92,6 +105,8 @@ function notify(title: string, body: string): void {
 
 export default function (pi: ExtensionAPI) {
     pi.on("agent_end", async () => {
-        notify("Pi", "Ready for input");
+        const win = getTmuxWindow();
+        const title = win ? `Pi ${win}` : "Pi";
+        notify(title, "Ready for input");
     });
 }
