@@ -25,6 +25,9 @@
         ],
         "video": "https://raw.githubusercontent.com/ferologics/pi-notify/master/demo.mp4"
     },
+    "scripts": {
+        "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    },
     "peerDependencies": {
         "@earendil-works/pi-coding-agent": "*"
     },

@@ -50,6 +50,26 @@ When Pi's agent finishes (`agent_end` event), the extension sends a notification
 
 Clicking the notification focuses the terminal window/tab.
 
+## Focused tmux panes
+
+Inside tmux, pi-notify skips the notification and custom sound hook when a focused, attached client is viewing the Pi pane. Viewing a different pane, window, or session does not suppress the notification. With multiple clients, one focused client viewing the Pi pane is enough to suppress it.
+
+Enable focus reporting in your tmux config:
+
+```tmux
+set -g focus-events on
+```
+
+The outer terminal must support focus reporting. The extension reads tmux state at completion; it does not change tmux settings, attach stdin listeners, or request macOS Automation permissions.
+
+If focus reporting is disabled, the pane cannot be identified, or a query fails, notifications continue as before. Queries have a 500 ms timeout and run in parallel. Outside tmux, focus suppression is not performed.
+
+To keep notifying even while viewing the Pi pane:
+
+```bash
+export PI_NOTIFY_FOCUS=0
+```
+
 ## Optional: Custom sound hook
 
 You can run a custom command whenever a notification is sent by setting `PI_NOTIFY_SOUND_CMD`.
@@ -88,6 +108,10 @@ OSC = Operating System Command, part of ANSI escape sequences. Terminals use the
 
 - **tmux** works only with passthrough enabled (`set -g allow-passthrough on`).
 - **zellij/screen** are still unsupported for OSC notifications.
+
+## Tests
+
+Run `npm test` with Node.js 22.6 or later. The tests use the built-in test runner and TypeScript stripping; no dependencies are required.
 
 ## License
 

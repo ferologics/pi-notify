@@ -12,6 +12,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isTmuxPaneFocused } from "./focus.ts";
 
 function windowsToastScript(title: string, body: string): string {
     const type = "Windows.UI.Notifications";
@@ -92,6 +93,7 @@ function notify(title: string, body: string): void {
 
 export default function (pi: ExtensionAPI) {
     pi.on("agent_end", async () => {
+        if (await isTmuxPaneFocused()) return;
         notify("Pi", "Ready for input");
     });
 }
