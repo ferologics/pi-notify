@@ -75,6 +75,13 @@ function runSoundHook(): void {
 }
 
 function notify(title: string, body: string): void {
+    // Skip headless runs: when stdout is not a TTY (piped output, scripts, CI, or
+    // nested Pi invocations whose output is captured by a parent process), there
+    // is no terminal to notify, and writing escape sequences would corrupt the
+    // captured output (and ring the parent's notification sound via its
+    // terminal). Set PI_NOTIFY_FORCE=1 to opt back in.
+    if (!process.stdout.isTTY && process.env.PI_NOTIFY_FORCE !== "1") return;
+
     const isIterm2 = process.env.TERM_PROGRAM === "iTerm.app" || Boolean(process.env.ITERM_SESSION_ID);
 
     if (process.env.WT_SESSION) {

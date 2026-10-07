@@ -50,6 +50,10 @@ When Pi's agent finishes (`agent_end` event), the extension sends a notification
 
 Clicking the notification focuses the terminal window/tab.
 
+### Headless runs
+
+Notifications are skipped when stdout is not a TTY (piped output, scripts, CI, or nested Pi invocations whose output is captured by another process) — there is no terminal to notify, and escape sequences would corrupt the captured output. Set `PI_NOTIFY_FORCE=1` to send notifications anyway.
+
 ## Optional: Custom sound hook
 
 You can run a custom command whenever a notification is sent by setting `PI_NOTIFY_SOUND_CMD`.
