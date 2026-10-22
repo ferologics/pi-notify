@@ -3,28 +3,14 @@
  *
  * Sends a native terminal notification when Pi agent is done and waiting for input.
  * Supports multiple terminal protocols:
- * - OSC 777: Ghostty, WezTerm, rxvt-unicode
+ * - OSC 777: Ghostty, WezTerm, rxvt-unicode, Windows Terminal 1.26+
  * - OSC 9: iTerm2
  * - OSC 99: Kitty
  * - tmux passthrough wrapper for OSC notifications
- * - Windows toast: Windows Terminal (WSL)
  * - Optional sound hook via PI_NOTIFY_SOUND_CMD
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-function windowsToastScript(title: string, body: string): string {
-    const type = "Windows.UI.Notifications";
-    const mgr = `[${type}.ToastNotificationManager, ${type}, ContentType = WindowsRuntime]`;
-    const template = `[${type}.ToastTemplateType]::ToastText01`;
-    const toast = `[${type}.ToastNotification]::new($xml)`;
-    return [
-        `${mgr} > $null`,
-        `$xml = [${type}.ToastNotificationManager]::GetTemplateContent(${template})`,
-        `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode('${body}')) > $null`,
-        `[${type}.ToastNotificationManager]::CreateToastNotifier('${title}').Show(${toast})`,
-    ].join("; ");
-}
 
 function wrapForTmux(sequence: string): string {
     if (!process.env.TMUX) return sequence;
@@ -52,11 +38,6 @@ function notifyOSC99(title: string, body: string): void {
     process.stdout.write(wrapForTmux(bodySequence));
 }
 
-function notifyWindows(title: string, body: string): void {
-    const { execFile } = require("node:child_process");
-    execFile("powershell.exe", ["-NoProfile", "-Command", windowsToastScript(title, body)]);
-}
-
 function runSoundHook(): void {
     const command = process.env.PI_NOTIFY_SOUND_CMD?.trim();
     if (!command) return;
@@ -78,7 +59,7 @@ function notify(title: string, body: string): void {
     const isIterm2 = process.env.TERM_PROGRAM === "iTerm.app" || Boolean(process.env.ITERM_SESSION_ID);
 
     if (process.env.WT_SESSION) {
-        notifyWindows(title, body);
+        notifyOSC777(title, body);
     } else if (process.env.KITTY_WINDOW_ID) {
         notifyOSC99(title, body);
     } else if (isIterm2) {

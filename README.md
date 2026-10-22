@@ -14,7 +14,7 @@ A [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) extension 
 | rxvt-unicode                   | ✓       | OSC 777                         |
 | Kitty                          | ✓       | OSC 99                          |
 | tmux (inside a supported term) | ✓*      | tmux passthrough + OSC 777/99/9 |
-| Windows Terminal               | ✓       | PowerShell toast                |
+| Windows Terminal 1.26+         | ✓       | OSC 777                         |
 | Terminal.app                   | ✗       | —                               |
 | Alacritty                      | ✗       | —                               |
 
@@ -46,9 +46,27 @@ When Pi's agent finishes (`agent_end` event), the extension sends a notification
 - **OSC 9** (iTerm2): iTerm2 notification protocol, detected via `TERM_PROGRAM=iTerm.app`
 - **OSC 99** (Kitty): Kitty's notification protocol, detected via `KITTY_WINDOW_ID`
 - **tmux passthrough**: OSC sequences are wrapped automatically when `TMUX` is set
-- **Windows toast** (Windows Terminal): PowerShell notification, detected via `WT_SESSION`
+- **OSC 777** (Windows Terminal 1.26+): detected via `WT_SESSION`
 
 Clicking the notification focuses the terminal window/tab.
+
+## Windows Terminal
+
+Needs Windows Terminal 1.26+ (currently Preview):
+
+```powershell
+winget install --id Microsoft.WindowsTerminal.Preview --exact --source winget
+```
+
+Then turn on notifications in Preview's settings JSON (in `profiles.defaults` or your Pi profile):
+
+```json
+"compatibility.allowOSC777": true
+```
+
+Clicking a notification jumps to the tab that sent it.
+
+If clicking also opens an extra window, turn off **Run this profile as Administrator** for that profile, then reopen Preview normally.
 
 ## Optional: Custom sound hook
 
