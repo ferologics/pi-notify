@@ -15,7 +15,8 @@ A [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) extension 
 | rxvt-unicode                   | ✓       | OSC 777                         |
 | Kitty                          | ✓       | OSC 99                          |
 | tmux (inside a supported term) | ✓*      | tmux passthrough + OSC 777/99/9 |
-| Windows Terminal 1.26+         | ✓       | OSC 777                         |
+| Windows Terminal               | ✓       | Windows toast (PowerShell)      |
+| Windows Terminal 1.26+ Preview | ✓       | OSC 777, opt-in                 |
 | Terminal.app                   | ✗       | —                               |
 | Alacritty                      | ✗       | —                               |
 
@@ -39,37 +40,68 @@ Or via git:
 pi install git:github.com/ferologics/pi-notify
 ```
 
-Restart Pi.
+Restart Pi. Needs Pi 0.80.4 or newer.
 
 ## How it works
 
-When Pi's agent finishes (`agent_end` event), the extension sends a notification via the appropriate protocol:
+The notification fires on Pi's `agent_settled` event: once the run is over and nothing else will start on its own (no retry, compaction, or queued message). It does not fire when:
 
-- **OSC 777** (Ghostty, WezTerm, rxvt-unicode): Native escape sequence
-- **OSC 9** (iTerm2): iTerm2 notification protocol, detected via `TERM_PROGRAM=iTerm.app`
-- **OSC 99** (Kitty): Kitty's notification protocol, detected via `KITTY_WINDOW_ID`
+- you stop the run with Esc
+- Pi runs without its terminal UI (`pi -p`, piped output, JSON or RPC mode), so nested and scripted runs stay quiet
+
+The title names the session, or the folder Pi runs in if the session has no name: `Pi (my-project)`.
+
+The protocol comes from the terminal:
+
+- **OSC 777** (Ghostty, WezTerm, rxvt-unicode): the default
+- **OSC 9** (iTerm2): detected via `TERM_PROGRAM=iTerm.app`, `ITERM_SESSION_ID`, or `LC_TERMINAL=iTerm2` (which SSH passes along)
+- **OSC 99** (Kitty): detected via `KITTY_WINDOW_ID`
+- **Windows toast** (Windows Terminal): a PowerShell notification, detected via `WT_SESSION`
 - **tmux passthrough**: OSC sequences are wrapped automatically when `TMUX` is set
-- **OSC 777** (Windows Terminal 1.26+): detected via `WT_SESSION`
 
-Clicking the notification focuses the terminal window/tab.
+Clicking an OSC notification focuses the terminal window/tab. Clicking a Windows toast does not take you back to the tab.
+
+### Choosing the protocol
+
+If detection picks the wrong one (for example inside a long-running tmux session started from another terminal), set `PI_NOTIFY_PROTOCOL` to `osc777`, `osc9`, `osc99`, or `toast`:
+
+```bash
+export PI_NOTIFY_PROTOCOL=osc9
+```
 
 ## Windows Terminal
 
-Needs Windows Terminal 1.26+ (currently Preview):
+By default pi-notify shows a Windows toast through PowerShell.
 
-```powershell
-winget install --id Microsoft.WindowsTerminal.Preview --exact --source winget
-```
+Windows Terminal 1.26+ (currently Preview) can show OSC 777 notifications itself, and clicking one jumps to the tab that sent it. To use that:
 
-Then turn on notifications in Preview's settings JSON (in `profiles.defaults` or your Pi profile):
+1. Install Preview:
 
-```json
-"compatibility.allowOSC777": true
-```
+   ```powershell
+   winget install --id Microsoft.WindowsTerminal.Preview --exact --source winget
+   ```
 
-Clicking a notification jumps to the tab that sent it.
+2. Turn on notifications in Preview's settings JSON (in `profiles.defaults` or your Pi profile):
+
+   ```json
+   "compatibility.allowOSC777": true
+   ```
+
+3. Tell pi-notify to use OSC 777:
+
+   ```bash
+   export PI_NOTIFY_PROTOCOL=osc777
+   ```
 
 If clicking also opens an extra window, turn off **Run this profile as Administrator** for that profile, then reopen Preview normally.
+
+### WSL in other terminals
+
+Outside Windows Terminal (VS Code's terminal, the classic console), pi-notify can't tell which terminal you're in, so it sends OSC 777, which those terminals ignore. Use the toast instead:
+
+```bash
+export PI_NOTIFY_PROTOCOL=toast
+```
 
 ## Optional: Custom sound hook
 
@@ -98,6 +130,19 @@ $env:PI_NOTIFY_SOUND_CMD = 'powershell -NoProfile -Command "[console]::beep(880,
 ```
 
 The command is run in the background (`shell: true`, detached) so it won't block Pi.
+
+## For extension authors: cancel or change a notification
+
+Before sending, pi-notify emits `pi-notify:before-notify` on Pi's event bus with `{ title, body, cancel }`. Set `cancel` to skip the notification (the sound hook is skipped too), or change `title`/`body`:
+
+```typescript
+pi.events.on("pi-notify:before-notify", (data) => {
+    const notification = data as { title: string; body: string; cancel: boolean };
+    if (backgroundWorkRunning()) notification.cancel = true;
+});
+```
+
+Decide synchronously: anything set after an `await` comes too late.
 
 ## What's OSC 777/99/9?
 
