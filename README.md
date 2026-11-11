@@ -9,6 +9,7 @@ A [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) extension 
 | Terminal                       | Support | Protocol                        |
 | ------------------------------ | ------- | ------------------------------- |
 | Ghostty                        | ✓       | OSC 777                         |
+| Rex                            | ✓†      | none: Rex notifies by itself    |
 | iTerm2                         | ✓       | OSC 9                           |
 | WezTerm                        | ✓       | OSC 777                         |
 | rxvt-unicode                   | ✓       | OSC 777                         |
@@ -17,6 +18,8 @@ A [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) extension 
 | Windows Terminal 1.26+         | ✓       | OSC 777                         |
 | Terminal.app                   | ✗       | —                               |
 | Alacritty                      | ✗       | —                               |
+
+† Pi reports its status to Rex (OSC 7501), and Rex's Program Activity settings turn that into notifications, so pi-notify sends none there (only the sound hook runs).
 
 \* tmux requires passthrough enabled in your tmux config:
 

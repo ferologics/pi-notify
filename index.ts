@@ -8,6 +8,8 @@
  * - OSC 99: Kitty
  * - tmux passthrough wrapper for OSC notifications
  * - Optional sound hook via PI_NOTIFY_SOUND_CMD
+ *
+ * In Rex it sends no notification: Pi reports its status to Rex itself (OSC 7501), and Rex notifies from that.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -58,7 +60,9 @@ function runSoundHook(): void {
 function notify(title: string, body: string): void {
     const isIterm2 = process.env.TERM_PROGRAM === "iTerm.app" || Boolean(process.env.ITERM_SESSION_ID);
 
-    if (process.env.WT_SESSION) {
+    if (process.env.TERM_PROGRAM === "rex") {
+        // Rex already notifies from Pi's status; a second notification would only double it.
+    } else if (process.env.WT_SESSION) {
         notifyOSC777(title, body);
     } else if (process.env.KITTY_WINDOW_ID) {
         notifyOSC99(title, body);
